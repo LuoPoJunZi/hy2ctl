@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${ROOT_DIR}"
 
 PYTHON_BIN="${PYTHON_BIN:-python3}"
+SING_BOX_BIN="${SING_BOX_BIN:-sing-box}"
 
 fail() {
   echo "[ERROR] $1"
@@ -29,10 +30,35 @@ import sys
 data = json.load(sys.stdin)
 assert data["dns"]["servers"][0]["detour"] == "proxy"
 assert "detour" not in data["dns"]["servers"][1]
+assert data["http_clients"][0]["tag"] == "rule-set-proxy"
+assert data["http_clients"][0]["detour"] == "proxy"
 assert data["route"]["default_domain_resolver"] == "cf"
-assert all(item["download_detour"] == "proxy" for item in data["route"]["rule_set"])
+assert data["route"]["default_http_client"] == "rule-set-proxy"
+assert all("download_detour" not in item for item in data["route"]["rule_set"])
 assert data["route"]["final"] == "proxy"
 ' || fail "Sing-box full template is not valid modern JSON"
+}
+
+validate_with_singbox() {
+  local payload="$1"
+  local label="$2"
+  local config_file
+
+  if ! command -v "${SING_BOX_BIN}" >/dev/null 2>&1; then
+    if [[ "${REQUIRE_SING_BOX_CHECK:-0}" == "1" ]]; then
+      fail "Required sing-box binary is unavailable: ${SING_BOX_BIN}"
+    fi
+    echo "[INFO] Skipping native sing-box check (${SING_BOX_BIN} not found)."
+    return
+  fi
+
+  config_file="$(mktemp)"
+  printf '%s\n' "${payload}" > "${config_file}"
+  if ! "${SING_BOX_BIN}" check -c "${config_file}"; then
+    rm -f "${config_file}"
+    fail "${label} template failed native sing-box validation"
+  fi
+  rm -f "${config_file}"
 }
 
 export HY2_LIB_ONLY=1
@@ -47,6 +73,9 @@ ca_json="$(render_singbox_full_template "8.8.8.8" "443" "20" "100" "abc123" "exa
 self_json="$(render_singbox_full_template "8.8.8.8" "443" "20" "100" "abc123" "bing.com" "true" "${public_key_sha}")"
 validate_singbox_json "${ca_json}"
 validate_singbox_json "${self_json}"
+echo "[INFO] Validating templates with sing-box 1.14+ when available..."
+validate_with_singbox "${ca_json}" "CA"
+validate_with_singbox "${self_json}" "self-signed"
 assert_contains "${self_json}" '"certificate_public_key_sha256": ["'"${public_key_sha}"'"]' "self-signed public key pin missing"
 if [[ "${ca_json}" == *"certificate_public_key_sha256"* ]]; then
   fail "CA template should not contain a self-signed public key pin"

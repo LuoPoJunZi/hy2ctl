@@ -207,9 +207,11 @@ assert_contains "${rendered_full_json}" "\"address\": [" "sing-box full template
 assert_contains "${rendered_full_json}" "\"type\": \"https\"" "sing-box full template new dns server missing"
 assert_contains "${rendered_full_json}" "\"detour\": \"proxy\"" "sing-box full template remote dns detour missing"
 assert_contains "${rendered_full_json}" "\"default_domain_resolver\": \"cf\"" "sing-box full template default resolver missing"
-assert_contains "${rendered_full_json}" "\"download_detour\": \"proxy\"" "sing-box full template rule-set download detour missing"
+assert_contains "${rendered_full_json}" "\"http_clients\": [" "sing-box full template HTTP clients missing"
+assert_contains "${rendered_full_json}" "\"tag\": \"rule-set-proxy\"" "sing-box full template rule-set HTTP client tag missing"
+assert_contains "${rendered_full_json}" "\"default_http_client\": \"rule-set-proxy\"" "sing-box full template default HTTP client missing"
 assert_contains "${rendered_full_json}" "\"certificate_public_key_sha256\": [\"${singbox_public_key_sha}\"]" "sing-box full template public key pin missing"
-if [[ "${rendered_full_json}" == *"\"geosite\":"* || "${rendered_full_json}" == *"\"geoip\":"* || "${rendered_full_json}" == *"\"inet4_address\""* || "${rendered_full_json}" == *"\"type\": \"dns\""* ]]; then
+if [[ "${rendered_full_json}" == *"\"geosite\":"* || "${rendered_full_json}" == *"\"geoip\":"* || "${rendered_full_json}" == *"\"inet4_address\""* || "${rendered_full_json}" == *"\"type\": \"dns\""* || "${rendered_full_json}" == *"\"download_detour\""* ]]; then
     fail "sing-box full template should not contain removed legacy fields"
 fi
 if [[ "${rendered_full_json}" == *"\"detour\": \"direct\""* ]]; then
@@ -245,7 +247,7 @@ assert_contains "${notice_output}" "insecure=1" "v2rayN insecure notice URI valu
 assert_contains "${notice_output}" "pinSHA256" "v2rayN certificate pin notice missing"
 assert_contains "${notice_output}" "pcs" "v2rayN Xray URI pin parameter missing"
 assert_contains "${notice_output}" "Xray-core >= 26.2.6" "v2rayN Xray version notice missing"
-assert_contains "${notice_output}" "v2rayN >= 7.24.8" "v2rayN security version notice missing"
+assert_contains "${notice_output}" "v2rayN >= 7.24.9" "v2rayN security version notice missing"
 assert_contains "${notice_output}" "Sing-box >= 1.13.0" "sing-box pin version notice missing"
 assert_contains "${notice_output}" "pinnedPeerCertSha256" "v2rayN Xray pin mapping notice missing"
 assert_contains "${notice_output}" "已移除 allowInsecure" "removed allowInsecure notice missing"

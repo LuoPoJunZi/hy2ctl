@@ -8,7 +8,7 @@
 # 交互式主面板不启用全局 errexit，各外部命令在对应流程中显式处理失败与回滚。
 
 # --- 1. 全局变量与颜色输出 ---
-sh_ver="v26.9.1"
+sh_ver="v26.9.7"
 
 _red="\033[0;31m"
 _green="\033[0;32m"
@@ -1199,6 +1199,7 @@ render_singbox_route_section() {
     cat << 'EOF'
   "route": {
     "default_domain_resolver": "cf",
+    "default_http_client": "rule-set-proxy",
     "rules": [
       {
         "action": "sniff"
@@ -1230,22 +1231,19 @@ render_singbox_route_section() {
         "type": "remote",
         "tag": "geosite-cn",
         "format": "binary",
-        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs",
-        "download_detour": "proxy"
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs"
       },
       {
         "type": "remote",
         "tag": "geoip-cn",
         "format": "binary",
-        "url": "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs",
-        "download_detour": "proxy"
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs"
       },
       {
         "type": "remote",
         "tag": "geosite-category-ads-all",
         "format": "binary",
-        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs",
-        "download_detour": "proxy"
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs"
       }
     ],
     "final": "proxy",
@@ -1256,6 +1254,17 @@ EOF
 
 # shellcheck shell=bash
 # 职责: Sing-box 完整配置模板组合
+
+render_singbox_http_clients_section() {
+    cat << 'EOF'
+  "http_clients": [
+    {
+      "tag": "rule-set-proxy",
+      "detour": "proxy"
+    }
+  ],
+EOF
+}
 
 render_singbox_inbounds_section() {
     cat << 'EOF'
@@ -1298,6 +1307,7 @@ render_singbox_full_template() {
 
     cat << EOF
 {
+$(render_singbox_http_clients_section)
 $(render_singbox_dns_section)
 $(render_singbox_inbounds_section)
 $(render_singbox_outbounds_section "${json_ip}" "${port}" "${up_mbps}" "${down_mbps}" "${json_password}" "${json_sni}" "${insecure}" "${public_key_field}")
@@ -1331,7 +1341,7 @@ show_singbox_template() {
 
     clear
     print_line
-    echo -e "     ${_green}--- Sing-box 完整模板 (Android/iOS / 1.13+) ---${_plain}"
+    echo -e "     ${_green}--- Sing-box 完整模板 (Android/iOS / 1.14+) ---${_plain}"
     print_line
     if ! render_singbox_full_template "${json_ip}" "${port}" "${up_mbps}" "${down_mbps}" "${json_password}" "${json_sni}" "${insecure}" "${cert_public_key_sha}"; then
         err "生成 Sing-box 完整模板失败，请重新配置节点。"
@@ -1385,7 +1395,7 @@ print_v2rayn_insecure_notice() {
     echo -e "  原生 Hysteria2 使用 insecure=1 与 pinSHA256 验证自签证书。"
     echo -e "  v2rayN / Xray 使用 pcs 映射 pinnedPeerCertSha256。"
     echo -e "  使用 Xray 时请确保：v2rayN >= 7.17.1，Xray-core >= 26.2.6。"
-    echo -e "  建议使用 v2rayN >= 7.24.8，以包含下载器安全与 HY2 兼容修复。"
+    echo -e "  请使用 v2rayN >= 7.24.9，以修复旧版下载器的中间人攻击风险。"
     echo -e "  Sing-box 自签配置使用公钥固定，请使用 Sing-box >= 1.13.0。"
     echo -e "  分享链接已移除 allowInsecure，不再依赖已废弃的跳过验证字段。"
     echo -e "  重新生成自签证书后指纹会变化，客户端必须重新导入节点。"

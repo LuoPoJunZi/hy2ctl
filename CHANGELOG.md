@@ -1,5 +1,11 @@
 # Changelog
 
+## v26.9.7 - 2026-09-07
+
+- v2rayN 安全建议更新到 `7.24.9+`，提醒用户规避旧版内置下载器的中间人攻击风险。
+- Sing-box 完整模板升级到 `1.14+`，远程规则集改用 `http_clients` 与 `route.default_http_client`，移除已弃用的 `download_detour`。
+- Release 发布依赖更新到 `softprops/action-gh-release v3.0.3`；Linux CI 固定下载并校验 Sing-box `1.14.0`，使用真实内核检查 CA 与自签完整模板。
+
 ## v26.9.1 - 2026-09-01
 
 - 一键安装器会自动安装或更新 Hysteria2 内核，减少首次部署步骤；后续面板和内核更新统一收纳到菜单 `(11)`。

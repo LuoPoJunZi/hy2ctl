@@ -1,6 +1,17 @@
 # shellcheck shell=bash
 # 职责: Sing-box 完整配置模板组合
 
+render_singbox_http_clients_section() {
+    cat << 'EOF'
+  "http_clients": [
+    {
+      "tag": "rule-set-proxy",
+      "detour": "proxy"
+    }
+  ],
+EOF
+}
+
 render_singbox_inbounds_section() {
     cat << 'EOF'
   "inbounds": [
@@ -42,6 +53,7 @@ render_singbox_full_template() {
 
     cat << EOF
 {
+$(render_singbox_http_clients_section)
 $(render_singbox_dns_section)
 $(render_singbox_inbounds_section)
 $(render_singbox_outbounds_section "${json_ip}" "${port}" "${up_mbps}" "${down_mbps}" "${json_password}" "${json_sni}" "${insecure}" "${public_key_field}")

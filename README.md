@@ -119,7 +119,7 @@ hy2
 
 ```text
 =====================================================
-  hy2ctl 管理面板 v26.9.1 |  快捷启动: hy2
+  hy2ctl 管理面板 v26.9.7 |  快捷启动: hy2
 =====================================================
   内核版本: v2.12.2    服务状态: 运行中
 -----------------------------------------------------
@@ -148,7 +148,7 @@ hy2
 - `4`：跟踪服务日志（实时）
 - `5`：卸载清理（高风险操作）
 - `6`：排障常用命令速查
-- `7`：完整 Sing-box 模板输出（兼容 sing-box 1.13+，自签模式包含公钥固定）
+- `7`：完整 Sing-box 模板输出（兼容 sing-box 1.14+，自签模式包含公钥固定）
 - `8`：环境健康检查 + 报告导出
 - `9`：查看最近一次诊断报告
 - `10`：手动备份/恢复配置
@@ -176,7 +176,7 @@ hy2
 适合：没有域名，想快速用 IP 连通。  
 要求：原生 Hysteria2 客户端必须开启 `insecure=true`，并使用脚本导出的 `pinSHA256` 固定证书；Sing-box 1.13+ 使用 `certificate_public_key_sha256` 固定证书公钥。
 
-注意：自签节点使用 Xray 时要求 v2rayN `7.17.1+`、Xray-core `26.2.6+`，并建议使用包含下载器安全与 HY2 兼容修复的 v2rayN `7.24.8+`。分享链接同时包含 Hysteria2 官方的 `pinSHA256` 和 Xray 分享规范的 `pcs`；v2rayN 会把 `pcs` 映射为 `pinnedPeerCertSha256`，链接不再输出已移除的 `allowInsecure`。Sing-box 配置则使用独立的公钥 SHA-256 固定字段。任一自签证书校验值读取失败时，脚本都会拒绝生成相应客户端配置，请通过菜单 `1` 重新配置证书。重新生成自签证书后必须重新导入节点。长期使用仍建议优先采用 CA 域名证书模式。
+注意：自签节点使用 Xray 时要求 v2rayN `7.17.1+`、Xray-core `26.2.6+`，并应使用修复旧版下载器中间人攻击风险的 v2rayN `7.24.9+`。分享链接同时包含 Hysteria2 官方的 `pinSHA256` 和 Xray 分享规范的 `pcs`；v2rayN 会把 `pcs` 映射为 `pinnedPeerCertSha256`，链接不再输出已移除的 `allowInsecure`。Sing-box 配置则使用独立的公钥 SHA-256 固定字段。任一自签证书校验值读取失败时，脚本都会拒绝生成相应客户端配置，请通过菜单 `1` 重新配置证书。重新生成自签证书后必须重新导入节点。长期使用仍建议优先采用 CA 域名证书模式。
 
 自签模式支持 SNI 预设：
 
@@ -197,14 +197,14 @@ hy2
 - 或复制 YAML 片段做手动配置
 - 自签模式按 Hysteria2 官方 URI 规范使用 `insecure=1` 和 `pinSHA256`；CA 证书模式省略 `insecure`
 - 自签链接额外包含 `pcs`，供 v2rayN/Xray 映射为 `pinnedPeerCertSha256`，不再输出 `allowInsecure`
-- Xray 兼容要求：v2rayN `7.17.1+`、Xray-core `26.2.6+`。安全与 HY2 兼容方面建议使用 v2rayN `7.24.8+`；旧版 Xray 不保证支持自签证书固定。
+- Xray 兼容要求：v2rayN `7.17.1+`、Xray-core `26.2.6+`。安全方面应使用 v2rayN `7.24.9+`；旧版 Xray 不保证支持自签证书固定。
 
 ### 7.2 Android / iOS（Sing-box）
 
 - 菜单 `2` 复制 Outbound 片段
 - 菜单 `7` 复制完整模板（适合新建配置，使用新版 `rule_set` 规则格式）
 - 自签模式要求 Sing-box `1.13.0+`，脚本会自动加入 `certificate_public_key_sha256` 公钥固定
-- 当前稳定版继续保留 `download_detour`；待 sing-box 1.14 成为稳定版后再迁移到 `http_client`
+- 完整模板要求 Sing-box `1.14.0+`，远程规则集通过顶层 `http_clients` 和 `route.default_http_client` 使用 `proxy` 出站下载，不再使用已弃用的 `download_detour`
 
 ### 7.3 自签模式注意
 

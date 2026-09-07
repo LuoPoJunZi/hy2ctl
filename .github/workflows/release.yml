@@ -54,7 +54,10 @@ jobs:
       - name: Install verification dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y shellcheck bats python3
+          sudo apt-get install -y shellcheck bats python3 curl
+
+      - name: Install pinned sing-box test binary
+        run: bash scripts/install-test-sing-box.sh
 
       - name: Make verify scripts executable
         run: chmod +x scripts/verify.sh scripts/build-panel.sh scripts/check-style.sh scripts/check-menu-sync.sh scripts/check-version-sync.sh scripts/check-release-package.sh scripts/smoke-e2e.sh tests/e2e/config-flow.sh tests/e2e/client-render.sh
@@ -90,7 +93,7 @@ jobs:
         run: ./scripts/verify.sh config-flow
 
       - name: Run client render flow
-        run: ./scripts/verify.sh client-render
+        run: REQUIRE_SING_BOX_CHECK=1 ./scripts/verify.sh client-render
 
       - name: Check if Release is Needed
         id: check_release
@@ -154,7 +157,7 @@ jobs:
 
       - name: Create Release
         if: env.should_release == 'true'
-        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           files: |
             code.tar.gz
