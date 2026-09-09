@@ -1,0 +1,1 @@
+FATAL failed to read server config {"error":"open /etc/hysteria/config.yaml: permission denied"}

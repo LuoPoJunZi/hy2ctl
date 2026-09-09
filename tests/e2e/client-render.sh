@@ -7,19 +7,8 @@ cd "${ROOT_DIR}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 SING_BOX_BIN="${SING_BOX_BIN:-sing-box}"
 
-fail() {
-  echo "[ERROR] $1"
-  exit 1
-}
-
-assert_contains() {
-  local haystack="$1"
-  local needle="$2"
-  local label="$3"
-  if [[ "${haystack}" != *"${needle}"* ]]; then
-    fail "${label} (missing: ${needle})"
-  fi
-}
+# shellcheck source=../helpers/assertions.sh
+source "${ROOT_DIR}/tests/helpers/assertions.sh"
 
 validate_singbox_json() {
   local payload="$1"

@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# 职责: 手动备份与恢复菜单编排
+# 职责: 手动备份与恢复菜单；实际操作位于 operations/backup_*.sh
 
 show_backup_restore_menu() {
     local action

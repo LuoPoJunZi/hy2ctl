@@ -4,6 +4,9 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
 
+# shellcheck source=lib/source-manifest.sh
+source "${ROOT_DIR}/scripts/lib/source-manifest.sh"
+
 fail() {
     echo "[ERROR] $1"
     exit 1
@@ -45,58 +48,21 @@ check_required_paths() {
     assert_list_contains "${list_file}" ".editorconfig"
     assert_list_contains "${list_file}" ".gitattributes"
     assert_list_contains "${list_file}" ".gitignore"
-    assert_list_contains "${list_file}" "src/bootstrap.sh"
-    assert_list_contains "${list_file}" "src/main.sh"
-    assert_list_contains "${list_file}" "src/core/output.sh"
-    assert_list_contains "${list_file}" "src/core/input.sh"
-    assert_list_contains "${list_file}" "src/core/environment.sh"
-    assert_list_contains "${list_file}" "src/core/validation.sh"
-    assert_list_contains "${list_file}" "src/core/encoding.sh"
-    assert_list_contains "${list_file}" "src/core/files.sh"
-    assert_list_contains "${list_file}" "src/core/network.sh"
-    assert_list_contains "${list_file}" "src/core/metadata.sh"
-    assert_list_contains "${list_file}" "src/hysteria/certificate.sh"
-    assert_list_contains "${list_file}" "src/hysteria/config_write.sh"
-    assert_list_contains "${list_file}" "src/hysteria/config_input.sh"
-    assert_list_contains "${list_file}" "src/hysteria/config_apply.sh"
-    assert_list_contains "${list_file}" "src/hysteria/config.sh"
-    assert_list_contains "${list_file}" "src/hysteria/permissions.sh"
-    assert_list_contains "${list_file}" "src/hysteria/rollback.sh"
-    assert_list_contains "${list_file}" "src/hysteria/service.sh"
-    assert_list_contains "${list_file}" "src/hysteria/install.sh"
-    assert_list_contains "${list_file}" "src/clients/hysteria2.sh"
-    assert_list_contains "${list_file}" "src/clients/singbox_outbound.sh"
-    assert_list_contains "${list_file}" "src/clients/singbox_dns.sh"
-    assert_list_contains "${list_file}" "src/clients/singbox_route.sh"
-    assert_list_contains "${list_file}" "src/clients/singbox_full.sh"
-    assert_list_contains "${list_file}" "src/clients/singbox.sh"
-    assert_list_contains "${list_file}" "src/clients/v2rayn.sh"
-    assert_list_contains "${list_file}" "src/clients/summary.sh"
-    assert_list_contains "${list_file}" "src/clients/exports.sh"
-    assert_list_contains "${list_file}" "src/clients/display.sh"
-    assert_list_contains "${list_file}" "src/clients/cheatsheet.sh"
-    assert_list_contains "${list_file}" "src/panel/update.sh"
-    assert_list_contains "${list_file}" "src/panel/menu.sh"
-    assert_list_contains "${list_file}" "src/operations/diagnostic_context.sh"
-    assert_list_contains "${list_file}" "src/operations/diagnostic_checks.sh"
-    assert_list_contains "${list_file}" "src/operations/diagnostic_report.sh"
-    assert_list_contains "${list_file}" "src/operations/diagnostics.sh"
-    assert_list_contains "${list_file}" "src/operations/backup_create.sh"
-    assert_list_contains "${list_file}" "src/operations/backup_restore.sh"
-    assert_list_contains "${list_file}" "src/operations/backup.sh"
-    assert_list_contains "${list_file}" "scripts/build-panel.sh"
-    assert_list_contains "${list_file}" "scripts/verify.sh"
-    assert_list_contains "${list_file}" "scripts/benchmark.sh"
-    assert_list_contains "${list_file}" "scripts/check-style.sh"
-    assert_list_contains "${list_file}" "scripts/check-menu-sync.sh"
-    assert_list_contains "${list_file}" "scripts/check-brand-sync.sh"
-    assert_list_contains "${list_file}" "scripts/check-version-sync.sh"
-    assert_list_contains "${list_file}" "scripts/check-release-package.sh"
-    assert_list_contains "${list_file}" "scripts/smoke-e2e.sh"
-    assert_list_contains "${list_file}" "tests/unit/hy2_core.bats"
-    assert_list_contains "${list_file}" "tests/e2e/config-flow.sh"
-    assert_list_contains "${list_file}" "tests/e2e/client-render.sh"
-    assert_list_contains "${list_file}" "tests/e2e/runtime-contracts.sh"
+    local path directory
+    load_panel_modules "${ROOT_DIR}" || fail "Invalid source module manifest"
+    for path in "${MODULES[@]}"; do
+        assert_list_contains "${list_file}" "${path}"
+    done
+    # 工程辅助文件必须完整随源码发布，避免只打包入口而遗漏 helpers/fixtures。
+    assert_list_contains "${list_file}" "scripts/panel-modules.list"
+    assert_list_contains "${list_file}" "scripts/lib/source-manifest.sh"
+    for directory in scripts tests docs; do
+        [[ -d "${directory}" ]] || fail "Missing engineering directory: ${directory}"
+    done
+    while IFS= read -r -d '' path; do
+        assert_list_contains "${list_file}" "${path}"
+    done < <(find scripts tests docs -type f -print0)
+
 }
 
 check_local_only_paths_absent() {

@@ -5,47 +5,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUTPUT_FILE="${ROOT_DIR}/hy2.sh"
 MODE="${1:-write}"
 
-MODULES=(
-    "src/bootstrap.sh"
-    "src/core/output.sh"
-    "src/core/input.sh"
-    "src/core/environment.sh"
-    "src/core/validation.sh"
-    "src/core/encoding.sh"
-    "src/core/files.sh"
-    "src/core/network.sh"
-    "src/core/metadata.sh"
-    "src/hysteria/certificate.sh"
-    "src/hysteria/permissions.sh"
-    "src/hysteria/rollback.sh"
-    "src/hysteria/service.sh"
-    "src/hysteria/install.sh"
-    "src/hysteria/config_write.sh"
-    "src/hysteria/config_input.sh"
-    "src/hysteria/config_apply.sh"
-    "src/hysteria/config.sh"
-    "src/clients/hysteria2.sh"
-    "src/clients/singbox_outbound.sh"
-    "src/clients/singbox_dns.sh"
-    "src/clients/singbox_route.sh"
-    "src/clients/singbox_full.sh"
-    "src/clients/singbox.sh"
-    "src/clients/v2rayn.sh"
-    "src/clients/summary.sh"
-    "src/clients/exports.sh"
-    "src/clients/display.sh"
-    "src/clients/cheatsheet.sh"
-    "src/panel/update.sh"
-    "src/operations/diagnostic_context.sh"
-    "src/operations/diagnostic_checks.sh"
-    "src/operations/diagnostic_report.sh"
-    "src/operations/diagnostics.sh"
-    "src/operations/backup_create.sh"
-    "src/operations/backup_restore.sh"
-    "src/operations/backup.sh"
-    "src/panel/menu.sh"
-    "src/main.sh"
-)
+# shellcheck source=lib/source-manifest.sh
+source "${ROOT_DIR}/scripts/lib/source-manifest.sh"
 
 fail() {
     echo "[ERROR] $1"
@@ -53,19 +14,8 @@ fail() {
 }
 
 validate_manifest() {
-    local discovered listed duplicates module
-
-    discovered="$(cd "${ROOT_DIR}" && find src -type f -name '*.sh' -print | sort)"
-    listed="$(printf '%s\n' "${MODULES[@]}" | sort)"
-    if [[ "${discovered}" != "${listed}" ]]; then
-        fail "Source module manifest is incomplete or contains an invalid path"
-    fi
-
-    MODULE_PATHS=()
-    for module in "${MODULES[@]}"; do
-        [[ -s "${ROOT_DIR}/${module}" ]] || fail "Missing source module: ${module}"
-        MODULE_PATHS+=("${ROOT_DIR}/${module}")
-    done
+    local duplicates
+    load_panel_modules "${ROOT_DIR}" || fail "Invalid source module manifest"
     duplicates="$(grep -hE '^[a-zA-Z_][a-zA-Z0-9_]*\(\)[[:space:]]*\{' "${MODULE_PATHS[@]}" |
         sed -E 's/\(\).*//' | sort | uniq -d)"
     if [[ -n "${duplicates}" ]]; then

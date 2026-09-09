@@ -220,7 +220,7 @@ format_host_for_url() {
 }
 
 # shellcheck shell=bash
-# 职责: 原子写入与自动配置快照
+# 职责: 通用文件原子写入
 
 write_file_atomic() {
     local target="$1"
@@ -233,64 +233,6 @@ write_file_atomic() {
     if ! mv -f "${tmp_file}" "${target}"; then
         rm -f "${tmp_file}" >/dev/null 2>&1 || true
         return 1
-    fi
-    return 0
-}
-
-backup_runtime_files() {
-    local name source_file backup_file absent_marker
-
-    mkdir -p "${HY2_BACKUP_DIR}" || return 1
-
-    for name in "${RUNTIME_FILE_NAMES[@]}"; do
-        backup_file="${HY2_BACKUP_DIR}/${name}.bak"
-        absent_marker="${backup_file}.absent"
-        rm -f -- "${backup_file}" "${absent_marker}" || return 1
-    done
-
-    for name in "${RUNTIME_FILE_NAMES[@]}"; do
-        source_file="${HY2_CONF_DIR}/${name}"
-        backup_file="${HY2_BACKUP_DIR}/${name}.bak"
-        absent_marker="${backup_file}.absent"
-        if [[ -e "${source_file}" ]]; then
-            cp -p -- "${source_file}" "${backup_file}" || return 1
-        else
-            : > "${absent_marker}" || return 1
-        fi
-    done
-    return 0
-}
-
-restore_runtime_files() {
-    local name target_file backup_file absent_marker
-    local restore_failed=0
-
-    for name in "${RUNTIME_FILE_NAMES[@]}"; do
-        target_file="${HY2_CONF_DIR}/${name}"
-        backup_file="${HY2_BACKUP_DIR}/${name}.bak"
-        absent_marker="${backup_file}.absent"
-        if [[ -f "${backup_file}" ]]; then
-            cp -p -- "${backup_file}" "${target_file}" || restore_failed=1
-        elif [[ -f "${absent_marker}" ]]; then
-            rm -f -- "${target_file}" || restore_failed=1
-        else
-            restore_failed=1
-        fi
-    done
-
-    if [[ "${restore_failed}" -ne 0 ]]; then
-        return 1
-    fi
-
-    set_config_dir_permissions
-    if [[ -f "${HY2_CONF_FILE}" ]]; then
-        set_server_config_permissions
-    fi
-    if [[ -f "${HY2_META_FILE}" ]]; then
-        chmod 600 "${HY2_META_FILE}" >/dev/null 2>&1 || true
-    fi
-    if [[ -f "${HY2_CONF_DIR}/server.key" && -f "${HY2_CONF_DIR}/server.crt" ]]; then
-        set_tls_file_permissions
     fi
     return 0
 }
@@ -529,6 +471,67 @@ set_tls_file_permissions() {
 }
 
 # shellcheck shell=bash
+# 职责: Hysteria2 四文件自动快照、缺失状态与恢复后的权限收敛
+
+backup_runtime_files() {
+    local name source_file backup_file absent_marker
+
+    mkdir -p "${HY2_BACKUP_DIR}" || return 1
+
+    for name in "${RUNTIME_FILE_NAMES[@]}"; do
+        backup_file="${HY2_BACKUP_DIR}/${name}.bak"
+        absent_marker="${backup_file}.absent"
+        rm -f -- "${backup_file}" "${absent_marker}" || return 1
+    done
+
+    for name in "${RUNTIME_FILE_NAMES[@]}"; do
+        source_file="${HY2_CONF_DIR}/${name}"
+        backup_file="${HY2_BACKUP_DIR}/${name}.bak"
+        absent_marker="${backup_file}.absent"
+        if [[ -e "${source_file}" ]]; then
+            cp -p -- "${source_file}" "${backup_file}" || return 1
+        else
+            : > "${absent_marker}" || return 1
+        fi
+    done
+    return 0
+}
+
+restore_runtime_files() {
+    local name target_file backup_file absent_marker
+    local restore_failed=0
+
+    for name in "${RUNTIME_FILE_NAMES[@]}"; do
+        target_file="${HY2_CONF_DIR}/${name}"
+        backup_file="${HY2_BACKUP_DIR}/${name}.bak"
+        absent_marker="${backup_file}.absent"
+        if [[ -f "${backup_file}" ]]; then
+            cp -p -- "${backup_file}" "${target_file}" || restore_failed=1
+        elif [[ -f "${absent_marker}" ]]; then
+            rm -f -- "${target_file}" || restore_failed=1
+        else
+            restore_failed=1
+        fi
+    done
+
+    if [[ "${restore_failed}" -ne 0 ]]; then
+        return 1
+    fi
+
+    set_config_dir_permissions
+    if [[ -f "${HY2_CONF_FILE}" ]]; then
+        set_server_config_permissions
+    fi
+    if [[ -f "${HY2_META_FILE}" ]]; then
+        chmod 600 "${HY2_META_FILE}" >/dev/null 2>&1 || true
+    fi
+    if [[ -f "${HY2_CONF_DIR}/server.key" && -f "${HY2_CONF_DIR}/server.crt" ]]; then
+        set_tls_file_permissions
+    fi
+    return 0
+}
+
+# shellcheck shell=bash
 # 职责: 配置失败回滚与启动故障提示
 
 abort_pending_config_change() {
@@ -590,60 +593,14 @@ show_service_failure_hint() {
 }
 
 # shellcheck shell=bash
-# 职责: Hysteria2 服务控制菜单
+# 职责: Hysteria2 服务状态变更；菜单交互位于 panel/service_menu.sh
 
-service_control_menu() {
-    local action
-    while true; do
-        clear
-        print_line
-        echo -e "               ${_green}--- 服务控制 ---${_plain}"
-        print_line
-        echo -e "    (1) 启动服务"
-        echo -e "    (2) 停止服务"
-        echo -e "    (3) 重启服务"
-        echo -e "    (4) 查看状态"
-        echo -e "    (0) 返回主菜单"
-        print_line
-        read_input " => 请选择操作 [0-4]: " action || return 0
-
-        case "${action}" in
-            1)
-                if systemctl start "${HY2_SERVICE}"; then
-                    ok "服务已启动。"
-                else
-                    err "启动失败，请检查日志。"
-                fi
-                sleep 1
-                ;;
-            2)
-                if systemctl stop "${HY2_SERVICE}"; then
-                    ok "服务已停止。"
-                else
-                    err "停止失败，请检查日志。"
-                fi
-                sleep 1
-                ;;
-            3)
-                if systemctl restart "${HY2_SERVICE}"; then
-                    ok "服务已重启。"
-                else
-                    err "重启失败，请检查日志。"
-                fi
-                sleep 1
-                ;;
-            4)
-                if systemctl is-active --quiet "${HY2_SERVICE}"; then
-                    ok "当前状态: 运行中"
-                else
-                    err "当前状态: 未运行"
-                fi
-                sleep 1
-                ;;
-            0) return 0 ;;
-            *) err "输入错误"; sleep 1 ;;
-        esac
-    done
+change_hy2_service_state() {
+    local action="$1"
+    case "${action}" in
+        start|stop|restart) systemctl "${action}" "${HY2_SERVICE}" ;;
+        *) err "不支持的服务操作: ${action}"; return 1 ;;
+    esac
 }
 
 # shellcheck shell=bash
@@ -2182,7 +2139,7 @@ restore_latest_manual_backup() {
 }
 
 # shellcheck shell=bash
-# 职责: 手动备份与恢复菜单编排
+# 职责: 手动备份与恢复菜单；实际操作位于 operations/backup_*.sh
 
 show_backup_restore_menu() {
     local action
@@ -2212,6 +2169,63 @@ show_backup_restore_menu() {
                 ls -1dt "${HY2_BACKUP_DIR}"/manual-* 2>/dev/null || echo "(空)"
                 print_line
                 wait_return
+                ;;
+            0) return 0 ;;
+            *) err "输入错误"; sleep 1 ;;
+        esac
+    done
+}
+
+# shellcheck shell=bash
+# 职责: Hysteria2 服务控制菜单
+
+service_control_menu() {
+    local action
+    while true; do
+        clear
+        print_line
+        echo -e "               ${_green}--- 服务控制 ---${_plain}"
+        print_line
+        echo -e "    (1) 启动服务"
+        echo -e "    (2) 停止服务"
+        echo -e "    (3) 重启服务"
+        echo -e "    (4) 查看状态"
+        echo -e "    (0) 返回主菜单"
+        print_line
+        read_input " => 请选择操作 [0-4]: " action || return 0
+
+        case "${action}" in
+            1)
+                if change_hy2_service_state start; then
+                    ok "服务已启动。"
+                else
+                    err "启动失败，请检查日志。"
+                fi
+                sleep 1
+                ;;
+            2)
+                if change_hy2_service_state stop; then
+                    ok "服务已停止。"
+                else
+                    err "停止失败，请检查日志。"
+                fi
+                sleep 1
+                ;;
+            3)
+                if change_hy2_service_state restart; then
+                    ok "服务已重启。"
+                else
+                    err "重启失败，请检查日志。"
+                fi
+                sleep 1
+                ;;
+            4)
+                if systemctl is-active --quiet "${HY2_SERVICE}"; then
+                    ok "当前状态: 运行中"
+                else
+                    err "当前状态: 未运行"
+                fi
+                sleep 1
                 ;;
             0) return 0 ;;
             *) err "输入错误"; sleep 1 ;;

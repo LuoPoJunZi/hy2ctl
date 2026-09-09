@@ -2,17 +2,16 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-export HY2_LIB_ONLY=1
-# shellcheck source=../../hy2.sh
-source "${ROOT_DIR}/hy2.sh"
-TMP_DIR="$(mktemp -d)"
-trap 'rm -rf -- "${TMP_DIR}"' EXIT
-HY2_CONF_DIR="${TMP_DIR}"
-HY2_CONF_FILE="${TMP_DIR}/config.yaml"
-HY2_META_FILE="${TMP_DIR}/meta.info"
-HY2_DIAG_DIR="${TMP_DIR}"
+# shellcheck source=../helpers/assertions.sh
+source "${ROOT_DIR}/tests/helpers/assertions.sh"
 
-fail() { printf '[ERROR] %s\n' "$1" >&2; exit 1; }
+# shellcheck source=../helpers/environment.sh
+source "${ROOT_DIR}/tests/helpers/environment.sh"
+test_load_panel
+test_create_environment
+TMP_DIR="${TEST_TMP_DIR}"
+trap test_cleanup_environment EXIT
+
 clear() { :; }
 sleep() { :; }
 wait_return() { :; }
@@ -28,7 +27,7 @@ test_metadata_transaction() (
     [[ "${port}" == 443 && "${password}" == '$(not-a-command)=x' ]]
     [[ "${up_mbps}" == "${DEFAULT_UP_MBPS}" && "${down_mbps}" == "${DEFAULT_DOWN_MBPS}" ]]
     [[ "${key}" == "${local_key}" && "${value}" == caller-value ]]
-    printf '\nport=70000\n' >> "${HY2_META_FILE}"
+    cp "${TEST_FIXTURE_DIR}/metadata/invalid-port.info" "${HY2_META_FILE}"
     if read_meta_info; then fail 'Invalid metadata accepted'; fi
     [[ -z "${ip}${port}${password}${sni}${insecure}${up_mbps}${down_mbps}" ]]
     ip="old-node"
@@ -159,6 +158,15 @@ test_syntax_gate() (
     grep -Fq 'zz-broken.sh' "${TMP_DIR}/syntax.log"
     printf '#!/bin/bash\n' > "${fixture}/tests/e2e/zz-broken.sh"
     bash "${fixture}/scripts/verify.sh" syntax > /dev/null
+    mkdir -p "${fixture}/src/core/nested" "${fixture}/scripts/lib/nested" "${fixture}/tests/helpers/nested"
+    for file in src/core/nested/broken.sh scripts/lib/nested/broken.sh tests/helpers/nested/broken.sh; do
+        printf 'if then\n' > "${fixture}/${file}"
+        if bash "${fixture}/scripts/verify.sh" syntax > "${TMP_DIR}/syntax.log" 2>&1; then
+            fail "Recursive syntax gate missed ${file}"
+        fi
+        grep -Fq "${file}" "${TMP_DIR}/syntax.log"
+        printf '#!/bin/bash\n' > "${fixture}/${file}"
+    done
     echo '[OK] Syntax gate checks every file, including later glob matches.'
 )
 

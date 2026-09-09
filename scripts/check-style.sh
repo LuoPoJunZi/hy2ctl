@@ -47,7 +47,7 @@ check_text_file() {
 while IFS= read -r -d '' file; do
     [[ -f "${file}" ]] || continue
     case "${file}" in
-        .editorconfig|.gitattributes|.gitignore|LICENSE|*.md|*.sh|*.bats|*.yml|*.yaml)
+        .editorconfig|.gitattributes|.gitignore|LICENSE|*.md|*.sh|*.bats|*.yml|*.yaml|*.list|tests/fixtures/*)
             check_text_file "${file}"
             ;;
     esac

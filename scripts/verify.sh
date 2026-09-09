@@ -19,11 +19,25 @@ require_cmds() {
     done
 }
 
+collect_shell_files() {
+    local file
+    SHELL_FILES=(hy2.sh install.sh)
+    # globstar/nullglob 只在子 Shell 生效；新增目录层级也会被发现。
+    while IFS= read -r -d '' file; do
+        SHELL_FILES+=("${file}")
+    done < <(
+        shopt -s globstar nullglob
+        files=(src/**/*.sh scripts/**/*.sh tests/**/*.sh)
+        if (( ${#files[@]} )); then printf '%s\0' "${files[@]}"; fi
+    )
+}
+
 run_syntax_checks() {
     require_cmds bash
     echo "[INFO] Running bash syntax checks..."
     local file
-    for file in hy2.sh install.sh src/*.sh src/*/*.sh scripts/*.sh tests/e2e/*.sh; do
+    collect_shell_files
+    for file in "${SHELL_FILES[@]}"; do
         bash -n "${file}"
     done
 }
@@ -43,7 +57,8 @@ run_style_checks() {
 run_shellcheck() {
     require_cmds shellcheck
     echo "[INFO] Running shellcheck..."
-    shellcheck -S error -x hy2.sh install.sh src/*.sh src/*/*.sh scripts/*.sh tests/e2e/*.sh
+    collect_shell_files
+    shellcheck -S error -x "${SHELL_FILES[@]}"
 }
 
 run_menu_sync_check() {
@@ -73,13 +88,13 @@ run_release_package_check() {
 run_smoke_e2e_checks() {
     require_cmds bash
     echo "[INFO] Running smoke E2E checks..."
-    bash scripts/smoke-e2e.sh
+    bash tests/e2e/smoke.sh
 }
 
 run_bats_tests() {
     require_cmds bats
     echo "[INFO] Running bats tests..."
-    bats tests/unit
+    bats --recursive tests/unit
 }
 
 run_config_flow_replay() {
@@ -100,6 +115,12 @@ run_runtime_contracts() {
     bash tests/e2e/runtime-contracts.sh
 }
 
+run_repository_layout() {
+    require_cmds bash tar git find cmp
+    echo "[INFO] Running manifest and release archive regression checks..."
+    bash tests/e2e/repository-layout.sh
+}
+
 run_all() {
     run_syntax_checks
     run_generated_panel_check
@@ -114,6 +135,7 @@ run_all() {
     run_config_flow_replay
     run_client_render_replay
     run_runtime_contracts
+    run_repository_layout
 }
 
 case "${1:-all}" in
@@ -130,10 +152,11 @@ case "${1:-all}" in
     config-flow) run_config_flow_replay ;;
     client-render) run_client_render_replay ;;
     runtime-contracts) run_runtime_contracts ;;
+    repository-layout) run_repository_layout ;;
     all) run_all ;;
     *)
         echo "[ERROR] Unknown verify target: $1"
-        echo "Usage: $0 [syntax|generated-panel|style|shellcheck|menu-sync|brand-sync|version-sync|release-package|smoke-e2e|bats|config-flow|client-render|runtime-contracts|all]"
+        echo "Usage: $0 [syntax|generated-panel|style|shellcheck|menu-sync|brand-sync|version-sync|release-package|smoke-e2e|bats|config-flow|client-render|runtime-contracts|repository-layout|all]"
         exit 1
         ;;
 esac

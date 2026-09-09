@@ -4,61 +4,24 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${ROOT_DIR}"
 
-fail() {
-  echo "[ERROR] $1"
-  exit 1
-}
+# shellcheck source=../helpers/assertions.sh
+source "${ROOT_DIR}/tests/helpers/assertions.sh"
 
-assert_contains_file() {
-  local file="$1"
-  local needle="$2"
-  local label="$3"
-  if ! grep -Fq "${needle}" "${file}"; then
-    fail "${label} (missing: ${needle})"
-  fi
-}
+# shellcheck source=../helpers/environment.sh
+source "${ROOT_DIR}/tests/helpers/environment.sh"
+test_load_panel
+test_create_environment
+tmp_dir="${TEST_TMP_DIR}"
+trap test_cleanup_environment EXIT
 
-assert_file_equals() {
-  local file="$1"
-  local expected="$2"
-  local label="$3"
-  local actual
-  actual="$(cat "${file}")"
-  if [[ "${actual}" != "${expected}" ]]; then
-    fail "${label} (expected: ${expected}, actual: ${actual})"
-  fi
-}
-
-tmp_dir="$(mktemp -d)"
-cleanup() {
-  rm -rf "${tmp_dir}"
-}
-trap cleanup EXIT
-
-export HY2_LIB_ONLY=1
-# shellcheck source=../../hy2.sh
-source "${ROOT_DIR}/hy2.sh"
-
-HY2_CONF_DIR="${tmp_dir}/etc-hysteria"
-HY2_CONF_FILE="${HY2_CONF_DIR}/config.yaml"
-HY2_META_FILE="${HY2_CONF_DIR}/meta.info"
-HY2_BACKUP_DIR="${HY2_CONF_DIR}/backup"
-mkdir -p "${HY2_CONF_DIR}" "${HY2_BACKUP_DIR}"
+# shellcheck source=../helpers/mocks.sh
+source "${ROOT_DIR}/tests/helpers/mocks.sh"
 
 # Mock runtime-only dependencies for deterministic e2e replay.
 ensure_hy2_core_installed() { return 0; }
 fetch_server_ip() { echo "9.9.9.9"; }
 clear() { :; }
 sleep() { :; }
-systemctl() {
-  case "${1:-}" in
-    show) echo "root"; return 0 ;;
-    restart) return 0 ;;
-    is-active) return 0 ;;
-    *) return 0 ;;
-  esac
-}
-
 echo "[INFO] Replaying config_hy2 interactive CA flow..."
 if ! config_hy2 <<< $'23456\ntest-password\n\n30\n60\n1\nexample.com\n\n'; then
   fail "config_hy2 should succeed in replay flow"

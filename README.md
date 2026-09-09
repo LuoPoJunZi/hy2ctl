@@ -11,6 +11,8 @@
 
 </div>
 
+[GitHub 仓库](https://github.com/LuoPoJunZi/hy2ctl) · [开发文档](docs/development.md)
+
 ---
 
 ## 1. 这是什么？适合谁用？
@@ -59,23 +61,26 @@
 │   ├── hysteria/                   # 安装、证书、配置、权限、服务和回滚
 │   ├── clients/                    # Hysteria2、Sing-box、v2rayN 配置输出
 │   ├── operations/                 # 诊断、备份与恢复
-│   ├── panel/                      # 面板更新与主菜单
+│   ├── panel/                      # 主菜单、服务/备份子菜单与面板更新
 │   └── main.sh                     # 启动入口
 ├── hy2.sh                          # 自动生成的单文件发布版，请勿手工编辑
 ├── install.sh                      # 安装入口，部署单文件 hy2 并自动安装/更新内核
 ├── scripts/
-│   ├── verify.sh                   # 本地/CI 一键检查入口
-│   ├── build-panel.sh              # 从 src/ 确定性生成 hy2.sh
-│   ├── check-menu-sync.sh          # 菜单与 README 一致性检查
-│   ├── check-brand-sync.sh         # 项目名称与仓库地址一致性检查
-│   ├── check-version-sync.sh       # 版本号与 README 标识一致性检查
-│   └── smoke-e2e.sh                # 无特权端到端冒烟测试
+│   ├── panel-modules.list          # 有序源码清单，构建与发布检查共用
+│   ├── lib/                        # 工程辅助库，不进入 VPS 单文件
+│   ├── verify.sh                   # 本地/CI 统一检查入口
+│   ├── build-panel.sh              # 确定性生成 hy2.sh
+│   └── benchmark.sh                # 无网络面板性能对比
 ├── tests/
-│   ├── e2e/
-│   │   ├── config-flow.sh          # CA/自签交互配置与回滚回放
-│   │   └── client-render.sh        # 客户端 JSON 解析与导出安全测试
-│   └── unit/
-│       └── hy2_core.bats           # 核心函数回归测试（bats）
+│   ├── helpers/                    # 公共断言、临时环境与模拟命令
+│   ├── fixtures/                   # 示例配置、异常元数据与日志
+│   ├── unit/                       # 按职责划分的 Bats 单元测试
+│   ├── e2e/                        # 冒烟、配置/导出回放与边界检查
+│   └── acceptance/                 # 独立 Linux VPS 验收清单
+├── docs/
+│   ├── architecture.md             # 模块职责与运行约定
+│   ├── development.md              # 开发、测试和性能检查
+│   └── release.md                  # 发布流程与验收要求
 └── .github/workflows/
     ├── lint.yml                    # Ubuntu + Debian 验证矩阵
     └── release.yml                 # 自动发布流程
@@ -262,97 +267,19 @@ namei -l /etc/hysteria/config.yaml
 
 ---
 
-## 10. 二次开发接手指南（重点）
+## 10. 开发与维护
 
-### 10.1 开发前准备
+开发请修改 `src/`，不要手工编辑生成版 `hy2.sh`。完整指南已分离：
 
-```bash
-git clone https://github.com/LuoPoJunZi/hy2ctl.git
-cd hy2ctl
-```
-
-### 10.2 本地检查（每次改动后执行）
+- [架构与模块边界](docs/architecture.md)
+- [开发、测试与性能检查](docs/development.md)
+- [发布流程与验收](docs/release.md)
+- [真实 Linux VPS 验收清单](tests/acceptance/README.md)
 
 ```bash
-chmod +x scripts/verify.sh scripts/build-panel.sh
-./scripts/verify.sh
+bash scripts/build-panel.sh
+bash scripts/verify.sh all
 ```
-
-`verify.sh` 会执行：
-
-- `bash -n` 语法检查
-- 模块源码与生成版 `hy2.sh` 一致性检查
-- 仓库文本规范检查（LF、文件末尾换行、尾随空白、YAML Tab）
-- `shellcheck` 静态检查（error 级）
-- 菜单与 README 预览一致性检查
-- 项目名称、仓库地址与安装/更新入口一致性检查
-- 版本号与 README 标识一致性检查
-- 发布包防污染检查（本地记忆文件、临时目录、已撤销模块化文件）
-- 无特权端到端冒烟测试（配置生成/元数据解析/SNI 选择/分享片段/重启失败回滚）
-- `bats` 核心函数回归测试（`tests/unit`）
-- 交互配置流程回放测试（`tests/e2e/config-flow.sh`）
-- Sing-box JSON 标准解析与客户端证书固定导出测试（`tests/e2e/client-render.sh`）
-- 运行时边界测试（`tests/e2e/runtime-contracts.sh`）：输入中断、元数据状态隔离、实时菜单状态与失败传播
-
-### 10.3 修改源码或新增菜单功能的标准步骤
-
-1. 在 `src/` 中找到对应职责模块，不要直接编辑生成版 `hy2.sh`
-2. 新增功能函数时放入最接近的职责模块，避免把业务逻辑写进 `main_menu`
-3. 修改菜单时同步更新 `src/panel/menu.sh` 与 README 菜单预览
-4. 执行 `bash scripts/build-panel.sh` 重新生成 `hy2.sh`
-5. 执行 `./scripts/verify.sh` 完成全部检查
-
-### 10.4 推荐编码约定
-
-- 新功能优先封装成函数，避免把逻辑直接写进 `main_menu`
-- 每个源码文件只承担一个清晰职责；不要为了减少文件数重新堆回综合模块
-- `hy2.sh` 是构建产物，CI 会拒绝源码与生成文件不一致的提交
-- 对外部命令（`systemctl/curl/openssl`）尽量做返回码判断
-- 配置写入后统一做权限收敛
-- 影响服务可用性的改动，优先考虑回滚路径
-- 使用 `.editorconfig` 统一 UTF-8、LF、缩进和文件末尾换行规则
-- Shell、Bats、YAML 和 Markdown 文件通过 `.gitattributes` 固定 LF 换行，避免 Windows 编辑后影响 Linux 执行
-
-### 10.5 发布流程说明
-
-- 版本来源：`src/bootstrap.sh` 中 `sh_ver`，构建时同步进入 `hy2.sh`
-- 版本号采用 `v年.月.日` 格式，例如 `v26.7.14`
-- push 到 `main` 后触发：
-  - `Lint`（质量检查）
-  - `Auto Release`（自动打包发布）
-- VPS 安装和菜单 `11` 的面板更新仍只部署单文件 `hy2.sh`，不会在服务器上动态下载模块
-- 发布包会额外校验模块源码和生成脚本，并避免本地记忆文件、临时检查目录或已撤销模块进入正式 Release
-
-### 10.6 模块边界与运行约定
-
-| 层 | 职责与约束 |
-| --- | --- |
-| `src/core/` | 通用输入、校验、编码、文件与网络操作；不承担菜单业务分派 |
-| `src/hysteria/` | 配置草稿 → 备份 → 证书与配置应用 → 激活/回滚；保留动态服务用户权限 |
-| `src/clients/` | 客户端模板与展示；证书固定校验失败禁止导出，模板调用失败必须向上传播 |
-| `src/operations/` | 诊断与备份恢复；每次使用新状态，不能引用失败解析后的旧节点信息 |
-| `src/panel/` | 菜单显示、分派、交互循环与面板更新；每次重绘刷新版本与服务状态 |
-| `src/main.sh` | 运行入口；`HY2_LIB_ONLY=1` 仅加载函数，供无特权测试使用 |
-
-- 全局变量只用于启动常量、`HY2_DRAFT_*` 配置草稿、`DIAG_*` 诊断上下文和兼容节点字段；导航选项与解析临时变量必须 `local`。
-- `read_input` 区分空行与 EOF：空行可使用默认值，EOF 必须立即返回，不能触发默认部署或菜单忙循环。
-- `read_meta_info` 先清空旧节点状态，用局部变量解析并校验，成功后才发布 `ip/port/password/sni/insecure/up_mbps/down_mbps`。未知字段不执行，旧文件缺带宽字段仍兼容。
-- 配置写入通过 here-document 直接交给 `write_file_atomic`，避免额外管道；权限收敛与四文件回滚仍由配置流程负责。
-- `download_script` 统一面板/内核安装脚本下载：连接超时 8 秒、单次请求最多 120 秒、最多重试 2 次（不是整个操作 120 秒）。调用方负责临时文件清理、语法校验与替换。
-- 模板顺序输出以减少子 Shell；组合函数必须逐段检查返回码。证书固定材料在首字节输出前校验。若写文件，调用方只能在渲染成功后发布临时文件，不能使用失败的部分输出。
-- 面板不启用全局 `set -e`；关键失败路径显式 `return`。工程脚本使用 `set -euo pipefail`，语法检查逐个遍历文件。
-- CI 的 Ubuntu、Debian 和发布任务统一执行 `verify.sh all`，包括品牌同步、运行时边界和真实 Sing-box 校验。
-
-### 10.7 性能检查
-
-```bash
-# 不访问网络或真实服务；只测试版本字符串提取与完整模板渲染。
-bash scripts/benchmark.sh ./hy2.sh 30
-# 在同一机器上比较上一提交（需 Git Bash/Linux Bash）。
-bash scripts/benchmark.sh <(git show HEAD:hy2.sh) 30
-```
-
-计时为本机累计耗时，不设置跨机器的硬阈值，也不代表代理吞吐量。版本探测不再调用 `grep/head`，模板组合移除六次命令替换，构建用一次 `grep` 和一次 `awk` 批量处理模块。网络带宽、拥塞控制和 Hysteria2 内核参数不在本次优化范围内。
 
 ---
 
