@@ -2,6 +2,7 @@
 # 职责: 手动备份与恢复菜单编排
 
 show_backup_restore_menu() {
+    local action
     while true; do
         clear
         print_line
@@ -12,7 +13,7 @@ show_backup_restore_menu() {
         echo -e "    (3) 查看手动备份列表"
         echo -e "    (0) 返回主菜单"
         print_line
-        read -r -p " => 请选择操作 [0-3]: " action
+        read_input " => 请选择操作 [0-3]: " action || return 0
 
         case "${action}" in
             1)

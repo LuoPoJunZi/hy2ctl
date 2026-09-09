@@ -2,6 +2,7 @@
 # 职责: Hysteria2 服务控制菜单
 
 service_control_menu() {
+    local action
     while true; do
         clear
         print_line
@@ -13,7 +14,7 @@ service_control_menu() {
         echo -e "    (4) 查看状态"
         echo -e "    (0) 返回主菜单"
         print_line
-        read -r -p " => 请选择操作 [0-4]: " action
+        read_input " => 请选择操作 [0-4]: " action || return 0
 
         case "${action}" in
             1)

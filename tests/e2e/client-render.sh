@@ -65,6 +65,21 @@ export HY2_LIB_ONLY=1
 # shellcheck source=../../hy2.sh
 source "${ROOT_DIR}/hy2.sh"
 
+echo "[INFO] Checking JSON escaping of all Bash-representable control bytes..."
+control_text=$'密码 "quote" \\ slash\n\r\t'
+for ((code = 1; code < 32; code++)); do
+  printf -v escaped '\\u%04x' "${code}"
+  printf -v char '%b' "${escaped}"
+  control_text+="${char}"
+done
+escaped_text="$(json_escape "${control_text}")"
+printf '"%s"\n' "${escaped_text}" | "${PYTHON_BIN}" -c '
+import json
+import sys
+expected = "密码 \"quote\" \\ slash\n\r\t" + "".join(chr(i) for i in range(1, 32))
+assert json.load(sys.stdin) == expected
+' || fail "JSON escaping failed control-byte/UTF-8 round trip"
+
 cert_sha="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 public_key_sha="47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU="
 

@@ -48,8 +48,11 @@ ensure_hy2_core_installed() {
 }
 
 get_hy2_core_version() {
+    local version_output
     command -v hysteria >/dev/null 2>&1 || return 1
-    hysteria version 2>/dev/null | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -n 1
+    version_output="$(hysteria version 2>/dev/null)" || return 1
+    [[ "${version_output}" =~ v[0-9]+\.[0-9]+\.[0-9]+ ]] || return 1
+    printf '%s\n' "${BASH_REMATCH[0]}"
 }
 
 version_at_least() {

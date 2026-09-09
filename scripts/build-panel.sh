@@ -8,6 +8,7 @@ MODE="${1:-write}"
 MODULES=(
     "src/bootstrap.sh"
     "src/core/output.sh"
+    "src/core/input.sh"
     "src/core/environment.sh"
     "src/core/validation.sh"
     "src/core/encoding.sh"
@@ -60,11 +61,13 @@ validate_manifest() {
         fail "Source module manifest is incomplete or contains an invalid path"
     fi
 
-    duplicates="$({
-        for module in "${MODULES[@]}"; do
-            grep -hE '^[a-zA-Z_][a-zA-Z0-9_]*\(\)[[:space:]]*\{' "${ROOT_DIR}/${module}" || true
-        done
-    } | sed -E 's/\(\).*//' | sort | uniq -d)"
+    MODULE_PATHS=()
+    for module in "${MODULES[@]}"; do
+        [[ -s "${ROOT_DIR}/${module}" ]] || fail "Missing source module: ${module}"
+        MODULE_PATHS+=("${ROOT_DIR}/${module}")
+    done
+    duplicates="$(grep -hE '^[a-zA-Z_][a-zA-Z0-9_]*\(\)[[:space:]]*\{' "${MODULE_PATHS[@]}" |
+        sed -E 's/\(\).*//' | sort | uniq -d)"
     if [[ -n "${duplicates}" ]]; then
         printf '[ERROR] Duplicate function definitions:\n%s\n' "${duplicates}"
         exit 1
@@ -73,17 +76,9 @@ validate_manifest() {
 
 build_panel() {
     local target="$1"
-    local index module
 
-    : > "${target}"
-    for ((index = 0; index < ${#MODULES[@]}; index++)); do
-        module="${MODULES[index]}"
-        [[ -s "${ROOT_DIR}/${module}" ]] || fail "Missing source module: ${module}"
-        cat "${ROOT_DIR}/${module}" >> "${target}"
-        if ((index + 1 < ${#MODULES[@]})); then
-            printf '\n' >> "${target}"
-        fi
-    done
+    # 源码遵循 LF 与末尾换行约定；单次读取全部模块，保留模块间一个空行。
+    awk 'FNR == 1 && NR > 1 { print "" } { print }' "${MODULE_PATHS[@]}" > "${target}"
 
     bash -n "${target}" || fail "Generated panel failed Bash syntax validation"
     grep -Fq 'sh_ver="v' "${target}" || fail "Generated panel is missing sh_ver"

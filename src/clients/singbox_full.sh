@@ -51,14 +51,13 @@ render_singbox_full_template() {
 
     public_key_field="$(render_singbox_public_key_field "${insecure}" "${public_key_sha}" "        ")" || return 1
 
-    cat << EOF
-{
-$(render_singbox_http_clients_section)
-$(render_singbox_dns_section)
-$(render_singbox_inbounds_section)
-$(render_singbox_outbounds_section "${json_ip}" "${port}" "${up_mbps}" "${down_mbps}" "${json_password}" "${json_sni}" "${insecure}" "${public_key_field}")
-$(render_singbox_route_section)
-$(render_singbox_experimental_section)
-}
-EOF
+    # 校验证书固定材料后顺序输出；调用方必须检查返回码，不得发布失败的部分输出。
+    printf '{\n' || return 1
+    render_singbox_http_clients_section || return 1
+    render_singbox_dns_section || return 1
+    render_singbox_inbounds_section || return 1
+    render_singbox_outbounds_section "${json_ip}" "${port}" "${up_mbps}" "${down_mbps}" "${json_password}" "${json_sni}" "${insecure}" "${public_key_field}" || return 1
+    render_singbox_route_section || return 1
+    render_singbox_experimental_section || return 1
+    printf '}\n'
 }

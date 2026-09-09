@@ -22,8 +22,7 @@ install_hy2_core() {
         return 1
     }
 
-    if ! curl -fL --retry 2 --connect-timeout 8 --max-time 120 \
-        -o "${installer_file}" "${HY2_INSTALL_URL}" >/dev/null 2>&1; then
+    if ! download_script "${HY2_INSTALL_URL}" "${installer_file}"; then
         rm -f -- "${installer_file}"
         err "下载安装脚本失败，请检查网络后重试。"
         return 1
@@ -56,9 +55,10 @@ install_hy2_core() {
 }
 
 uninstall_hy2() {
+    local confirm
     print_line
     echo -e "${_red}[警告] 这将彻底卸载 Hysteria2 及所有节点配置！${_plain}"
-    read -r -p " => 确定要继续吗？(y/n): " confirm
+    read_input " => 确定要继续吗？(y/n): " confirm || return 1
     if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
         systemctl stop "${HY2_SERVICE}" >/dev/null 2>&1 || true
         systemctl disable "${HY2_SERVICE}" >/dev/null 2>&1 || true

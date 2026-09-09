@@ -59,41 +59,8 @@ jobs:
       - name: Install pinned sing-box test binary
         run: bash scripts/install-test-sing-box.sh
 
-      - name: Make verify scripts executable
-        run: chmod +x scripts/verify.sh scripts/build-panel.sh scripts/check-style.sh scripts/check-menu-sync.sh scripts/check-version-sync.sh scripts/check-release-package.sh scripts/smoke-e2e.sh tests/e2e/config-flow.sh tests/e2e/client-render.sh
-
-      - name: Run bash syntax checks
-        run: ./scripts/verify.sh syntax
-
-      - name: Check generated panel
-        run: ./scripts/verify.sh generated-panel
-
-      - name: Check repository style
-        run: ./scripts/verify.sh style
-
-      - name: Run shellcheck
-        run: ./scripts/verify.sh shellcheck
-
-      - name: Check menu sync
-        run: ./scripts/verify.sh menu-sync
-
-      - name: Check version sync
-        run: ./scripts/verify.sh version-sync
-
-      - name: Check release package guardrails
-        run: ./scripts/verify.sh release-package
-
-      - name: Run smoke E2E
-        run: ./scripts/verify.sh smoke-e2e
-
-      - name: Run bats tests
-        run: ./scripts/verify.sh bats
-
-      - name: Run config flow replay
-        run: ./scripts/verify.sh config-flow
-
-      - name: Run client render flow
-        run: REQUIRE_SING_BOX_CHECK=1 ./scripts/verify.sh client-render
+      - name: Run complete verification suite
+        run: REQUIRE_SING_BOX_CHECK=1 bash scripts/verify.sh all
 
       - name: Check if Release is Needed
         id: check_release

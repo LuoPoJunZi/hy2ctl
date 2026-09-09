@@ -22,11 +22,10 @@ require_cmds() {
 run_syntax_checks() {
     require_cmds bash
     echo "[INFO] Running bash syntax checks..."
-    bash -n hy2.sh
-    bash -n install.sh
-    bash -n src/*.sh src/*/*.sh
-    bash -n scripts/*.sh
-    bash -n tests/e2e/*.sh
+    local file
+    for file in hy2.sh install.sh src/*.sh src/*/*.sh scripts/*.sh tests/e2e/*.sh; do
+        bash -n "${file}"
+    done
 }
 
 run_generated_panel_check() {
@@ -95,6 +94,12 @@ run_client_render_replay() {
     bash tests/e2e/client-render.sh
 }
 
+run_runtime_contracts() {
+    require_cmds bash
+    echo "[INFO] Running runtime boundary and failure propagation checks..."
+    bash tests/e2e/runtime-contracts.sh
+}
+
 run_all() {
     run_syntax_checks
     run_generated_panel_check
@@ -108,6 +113,7 @@ run_all() {
     run_bats_tests
     run_config_flow_replay
     run_client_render_replay
+    run_runtime_contracts
 }
 
 case "${1:-all}" in
@@ -123,10 +129,11 @@ case "${1:-all}" in
     bats) run_bats_tests ;;
     config-flow) run_config_flow_replay ;;
     client-render) run_client_render_replay ;;
+    runtime-contracts) run_runtime_contracts ;;
     all) run_all ;;
     *)
         echo "[ERROR] Unknown verify target: $1"
-        echo "Usage: $0 [syntax|generated-panel|style|shellcheck|menu-sync|brand-sync|version-sync|release-package|smoke-e2e|bats|config-flow|client-render|all]"
+        echo "Usage: $0 [syntax|generated-panel|style|shellcheck|menu-sync|brand-sync|version-sync|release-package|smoke-e2e|bats|config-flow|client-render|runtime-contracts|all]"
         exit 1
         ;;
 esac

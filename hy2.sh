@@ -8,7 +8,7 @@
 # 交互式主面板不启用全局 errexit，各外部命令在对应流程中显式处理失败与回滚。
 
 # --- 1. 全局变量与颜色输出 ---
-sh_ver="v26.9.7"
+sh_ver="v26.9.9"
 
 _red="\033[0;31m"
 _green="\033[0;32m"
@@ -40,17 +40,27 @@ RUNTIME_FILE_NAMES=("config.yaml" "meta.info" "server.crt" "server.key")
 # shellcheck shell=bash
 # 职责: 终端消息与基础界面输出
 
-msg() { echo -e "${_blue}[信息]${_plain} $1"; }
+msg() { printf '%b[信息]%b %s\n' "${_blue}" "${_plain}" "$1"; }
 
-ok() { echo -e "${_green}[成功]${_plain} $1"; }
+ok() { printf '%b[成功]%b %s\n' "${_green}" "${_plain}" "$1"; }
 
-err() { echo -e "${_red}[错误]${_plain} $1"; }
+err() { printf '%b[错误]%b %s\n' "${_red}" "${_plain}" "$1"; }
 
 print_line() { echo -e "${_blue}=====================================================${_plain}"; }
 
 print_sub_line() { echo -e "${_blue}-----------------------------------------------------${_plain}"; }
 
 wait_return() { read -n 1 -s -r -p "按任意键返回主菜单..."; }
+
+# shellcheck shell=bash
+# 职责: 交互输入边界；空行允许采用默认值，EOF 必须中止当前操作
+
+read_input() {
+    if ! read -r -p "$1" "$2"; then
+        err "输入已结束，取消当前操作。" >&2
+        return 1
+    fi
+}
 
 # shellcheck shell=bash
 # 职责: 运行环境、依赖和版本判断
@@ -102,8 +112,11 @@ ensure_hy2_core_installed() {
 }
 
 get_hy2_core_version() {
+    local version_output
     command -v hysteria >/dev/null 2>&1 || return 1
-    hysteria version 2>/dev/null | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -n 1
+    version_output="$(hysteria version 2>/dev/null)" || return 1
+    [[ "${version_output}" =~ v[0-9]+\.[0-9]+\.[0-9]+ ]] || return 1
+    printf '%s\n' "${BASH_REMATCH[0]}"
 }
 
 version_at_least() {
@@ -179,11 +192,21 @@ url_encode() {
 
 json_escape() {
     local s="$1"
+    local code char escaped
     s="${s//\\/\\\\}"
     s="${s//\"/\\\"}"
     s="${s//$'\n'/\\n}"
     s="${s//$'\r'/\\r}"
     s="${s//$'\t'/\\t}"
+    # 常见字符串保留快速路径；其余 U+0001..U+001F 也必须转义为合法 JSON。
+    # Bash 字符串无法保存 NUL，因此不接受/不宣称支持 U+0000 输入。
+    if [[ "${s}" == *[$'\001'-$'\037']* ]]; then
+        for ((code = 1; code < 32; code++)); do
+            printf -v escaped '\\u%04x' "${code}"
+            printf -v char '%b' "${escaped}"
+            s="${s//"${char}"/"${escaped}"}"
+        done
+    fi
     printf '%s' "${s}"
 }
 
@@ -273,7 +296,13 @@ restore_runtime_files() {
 }
 
 # shellcheck shell=bash
-# 职责: 服务器公网地址发现
+# 职责: 有界脚本下载与服务器公网地址发现
+
+# target 由调用方通过 mktemp 创建；失败后的删除、校验与替换仍由调用方负责。
+download_script() {
+    curl -fL --retry 2 --connect-timeout 8 --max-time 120 \
+        -o "$2" "$1" >/dev/null 2>&1
+}
 
 fetch_server_ip() {
     local ip
@@ -290,7 +319,7 @@ fetch_server_ip() {
 # shellcheck shell=bash
 # 职责: 节点元数据安全读写
 
-read_meta_info() {
+reset_meta_info() {
     ip=""
     port=""
     password=""
@@ -298,40 +327,55 @@ read_meta_info() {
     insecure=""
     up_mbps=""
     down_mbps=""
+}
 
-    while IFS='=' read -r key value; do
+read_meta_info() {
+    local key value
+    local meta_ip="" meta_port="" meta_password="" meta_sni="" meta_insecure=""
+    local meta_up="" meta_down=""
+    reset_meta_info
+    [[ -f "${HY2_META_FILE}" && -r "${HY2_META_FILE}" ]] || return 1
+
+    # 仅解析白名单字段，不执行内容；兼容末行没有换行的旧元数据。
+    while IFS='=' read -r key value || [[ -n "${key}" ]]; do
         case "${key}" in
-            ip) ip="${value}" ;;
-            port) port="${value}" ;;
-            password) password="${value}" ;;
-            sni) sni="${value}" ;;
-            insecure) insecure="${value}" ;;
-            up_mbps) up_mbps="${value}" ;;
-            down_mbps) down_mbps="${value}" ;;
+            ip) meta_ip="${value}" ;;
+            port) meta_port="${value}" ;;
+            password) meta_password="${value}" ;;
+            sni) meta_sni="${value}" ;;
+            insecure) meta_insecure="${value}" ;;
+            up_mbps) meta_up="${value}" ;;
+            down_mbps) meta_down="${value}" ;;
         esac
     done < "${HY2_META_FILE}"
 
-    if [[ -z "${ip}" || -z "${port}" || -z "${password}" || -z "${sni}" || -z "${insecure}" ]]; then
+    if [[ -z "${meta_ip}" || -z "${meta_port}" || -z "${meta_password}" || -z "${meta_sni}" ]]; then
         return 1
     fi
-    if ! is_valid_port "${port}"; then
+    if ! is_valid_port "${meta_port}"; then
         return 1
     fi
-    port="$((10#${port}))"
-    if [[ "${insecure}" != "true" && "${insecure}" != "false" ]]; then
+    if [[ "${meta_insecure}" != "true" && "${meta_insecure}" != "false" ]]; then
         return 1
     fi
-    [[ -z "${up_mbps}" ]] && up_mbps="${DEFAULT_UP_MBPS}"
-    [[ -z "${down_mbps}" ]] && down_mbps="${DEFAULT_DOWN_MBPS}"
-    if ! is_positive_integer "${up_mbps}" || ! is_positive_integer "${down_mbps}"; then
+    [[ -z "${meta_up}" ]] && meta_up="${DEFAULT_UP_MBPS}"
+    [[ -z "${meta_down}" ]] && meta_down="${DEFAULT_DOWN_MBPS}"
+    if ! is_positive_integer "${meta_up}" || ! is_positive_integer "${meta_down}"; then
         return 1
     fi
-    up_mbps="$((10#${up_mbps}))"
-    down_mbps="$((10#${down_mbps}))"
+    # 完整校验后才发布兼容字段；失败时不留下上一节点或半解析的数据。
+    ip="${meta_ip}"
+    port="$((10#${meta_port}))"
+    password="${meta_password}"
+    sni="${meta_sni}"
+    insecure="${meta_insecure}"
+    up_mbps="$((10#${meta_up}))"
+    down_mbps="$((10#${meta_down}))"
     return 0
 }
 
 require_meta_info() {
+    reset_meta_info
     if [[ ! -f "${HY2_META_FILE}" ]]; then
         err "未找到节点元数据，请先执行 (1) 配置 Hysteria2 节点！"
         sleep 2
@@ -354,7 +398,7 @@ write_meta_info() {
     local up_mbps="$6"
     local down_mbps="$7"
 
-    cat << EOF | write_file_atomic "${HY2_META_FILE}"
+    write_file_atomic "${HY2_META_FILE}" << EOF
 ip=${ip}
 port=${port}
 password=${password}
@@ -549,6 +593,7 @@ show_service_failure_hint() {
 # 职责: Hysteria2 服务控制菜单
 
 service_control_menu() {
+    local action
     while true; do
         clear
         print_line
@@ -560,7 +605,7 @@ service_control_menu() {
         echo -e "    (4) 查看状态"
         echo -e "    (0) 返回主菜单"
         print_line
-        read -r -p " => 请选择操作 [0-4]: " action
+        read_input " => 请选择操作 [0-4]: " action || return 0
 
         case "${action}" in
             1)
@@ -625,8 +670,7 @@ install_hy2_core() {
         return 1
     }
 
-    if ! curl -fL --retry 2 --connect-timeout 8 --max-time 120 \
-        -o "${installer_file}" "${HY2_INSTALL_URL}" >/dev/null 2>&1; then
+    if ! download_script "${HY2_INSTALL_URL}" "${installer_file}"; then
         rm -f -- "${installer_file}"
         err "下载安装脚本失败，请检查网络后重试。"
         return 1
@@ -659,9 +703,10 @@ install_hy2_core() {
 }
 
 uninstall_hy2() {
+    local confirm
     print_line
     echo -e "${_red}[警告] 这将彻底卸载 Hysteria2 及所有节点配置！${_plain}"
-    read -r -p " => 确定要继续吗？(y/n): " confirm
+    read_input " => 确定要继续吗？(y/n): " confirm || return 1
     if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
         systemctl stop "${HY2_SERVICE}" >/dev/null 2>&1 || true
         systemctl disable "${HY2_SERVICE}" >/dev/null 2>&1 || true
@@ -689,7 +734,7 @@ write_ca_config() {
     local password="$4"
     local masquerade_url="$5"
 
-    cat << EOF | write_file_atomic "${HY2_CONF_FILE}"
+    write_file_atomic "${HY2_CONF_FILE}" << EOF
 listen: :${port}
 acme:
   domains:
@@ -711,7 +756,7 @@ write_self_signed_config() {
     local password="$2"
     local masquerade_url="$3"
 
-    cat << EOF | write_file_atomic "${HY2_CONF_FILE}"
+    write_file_atomic "${HY2_CONF_FILE}" << EOF
 listen: :${port}
 tls:
   cert: ${HY2_CONF_DIR}/server.crt
@@ -746,7 +791,7 @@ reset_hy2_config_draft() {
 collect_hy2_connection_settings() {
     local default_pwd
 
-    read -r -p " => 请设置监听端口 (默认 ${DEFAULT_PORT}): " HY2_DRAFT_PORT
+    read_input " => 请设置监听端口 (默认 ${DEFAULT_PORT}): " HY2_DRAFT_PORT || return 1
     [[ -z "${HY2_DRAFT_PORT}" ]] && HY2_DRAFT_PORT="${DEFAULT_PORT}"
     if ! is_valid_port "${HY2_DRAFT_PORT}"; then
         err "端口无效，请输入 1-65535 的整数。"
@@ -760,10 +805,10 @@ collect_hy2_connection_settings() {
         sleep 2
         return 1
     fi
-    read -r -p " => 请设置认证密码 (默认随机: ${default_pwd}): " HY2_DRAFT_PASSWORD
+    read_input " => 请设置认证密码 (默认随机: ${default_pwd}): " HY2_DRAFT_PASSWORD || return 1
     [[ -z "${HY2_DRAFT_PASSWORD}" ]] && HY2_DRAFT_PASSWORD="${default_pwd}"
 
-    read -r -p " => 请设置伪装网址 (默认 ${DEFAULT_MASQUERADE_URL}): " HY2_DRAFT_MASQUERADE_URL
+    read_input " => 请设置伪装网址 (默认 ${DEFAULT_MASQUERADE_URL}): " HY2_DRAFT_MASQUERADE_URL || return 1
     [[ -z "${HY2_DRAFT_MASQUERADE_URL}" ]] && HY2_DRAFT_MASQUERADE_URL="${DEFAULT_MASQUERADE_URL}"
     if ! is_valid_url "${HY2_DRAFT_MASQUERADE_URL}"; then
         err "伪装网址格式无效，必须以 http:// 或 https:// 开头。"
@@ -771,7 +816,7 @@ collect_hy2_connection_settings() {
         return 1
     fi
 
-    read -r -p " => 请设置上行带宽 Mbps (默认 ${DEFAULT_UP_MBPS}): " HY2_DRAFT_UP_MBPS
+    read_input " => 请设置上行带宽 Mbps (默认 ${DEFAULT_UP_MBPS}): " HY2_DRAFT_UP_MBPS || return 1
     [[ -z "${HY2_DRAFT_UP_MBPS}" ]] && HY2_DRAFT_UP_MBPS="${DEFAULT_UP_MBPS}"
     if ! is_positive_integer "${HY2_DRAFT_UP_MBPS}"; then
         err "上行带宽无效，请输入大于 0 的整数。"
@@ -780,7 +825,7 @@ collect_hy2_connection_settings() {
     fi
     HY2_DRAFT_UP_MBPS="$((10#${HY2_DRAFT_UP_MBPS}))"
 
-    read -r -p " => 请设置下行带宽 Mbps (默认 ${DEFAULT_DOWN_MBPS}): " HY2_DRAFT_DOWN_MBPS
+    read_input " => 请设置下行带宽 Mbps (默认 ${DEFAULT_DOWN_MBPS}): " HY2_DRAFT_DOWN_MBPS || return 1
     [[ -z "${HY2_DRAFT_DOWN_MBPS}" ]] && HY2_DRAFT_DOWN_MBPS="${DEFAULT_DOWN_MBPS}"
     if ! is_positive_integer "${HY2_DRAFT_DOWN_MBPS}"; then
         err "下行带宽无效，请输入大于 0 的整数。"
@@ -800,7 +845,7 @@ pick_self_signed_sni() {
     echo -e "     (4) ${SELF_SNI_PRESETS[3]}"
     echo -e "     (5) ${SELF_SNI_PRESETS[4]}"
     echo -e "     (0) 手动输入域名"
-    read -r -p " [*] 请选择 [0-5] (默认 1): " pick
+    read_input " [*] 请选择 [0-5] (默认 1): " pick || return 1
     [[ -z "${pick}" ]] && pick=1
 
     case "${pick}" in
@@ -810,7 +855,7 @@ pick_self_signed_sni() {
         4) PICKED_SNI="${SELF_SNI_PRESETS[3]}" ;;
         5) PICKED_SNI="${SELF_SNI_PRESETS[4]}" ;;
         0)
-            read -r -p " [*] 请输入用于伪装的 SNI 域名 (默认 ${DEFAULT_SELF_SNI}): " custom_sni
+            read_input " [*] 请输入用于伪装的 SNI 域名 (默认 ${DEFAULT_SELF_SNI}): " custom_sni || return 1
             [[ -z "${custom_sni}" ]] && custom_sni="${DEFAULT_SELF_SNI}"
             PICKED_SNI="${custom_sni}"
             ;;
@@ -825,7 +870,7 @@ collect_hy2_certificate_settings() {
     echo -e "\n[*] 请选择证书模式："
     echo -e "  (1) CA 域名证书 (推荐，需要提前将域名解析到本 VPS)"
     echo -e "  (2) 自签证书 (默认，无需域名，直接使用 IP 连通)"
-    read -r -p " => 请选择 [1-2] (默认 ${DEFAULT_CERT_TYPE}): " HY2_DRAFT_CERT_TYPE
+    read_input " => 请选择 [1-2] (默认 ${DEFAULT_CERT_TYPE}): " HY2_DRAFT_CERT_TYPE || return 1
     [[ -z "${HY2_DRAFT_CERT_TYPE}" ]] && HY2_DRAFT_CERT_TYPE="${DEFAULT_CERT_TYPE}"
     if [[ "${HY2_DRAFT_CERT_TYPE}" != "1" && "${HY2_DRAFT_CERT_TYPE}" != "2" ]]; then
         err "证书模式输入无效，请输入 1 或 2。"
@@ -834,13 +879,13 @@ collect_hy2_certificate_settings() {
     fi
 
     if [[ "${HY2_DRAFT_CERT_TYPE}" == "1" ]]; then
-        read -r -p " [*] 请输入已解析到本机的域名: " HY2_DRAFT_DOMAIN
+        read_input " [*] 请输入已解析到本机的域名: " HY2_DRAFT_DOMAIN || return 1
         if ! is_valid_domain "${HY2_DRAFT_DOMAIN}"; then
             err "域名格式无效，请输入有效域名（例如 example.com）。"
             sleep 2
             return 1
         fi
-        read -r -p " [*] 请输入邮箱 (用于自动申请证书，随意填): " HY2_DRAFT_EMAIL
+        read_input " [*] 请输入邮箱 (用于自动申请证书，随意填): " HY2_DRAFT_EMAIL || return 1
         [[ -z "${HY2_DRAFT_EMAIL}" ]] && HY2_DRAFT_EMAIL="admin@${HY2_DRAFT_DOMAIN}"
         if ! is_valid_email "${HY2_DRAFT_EMAIL}"; then
             err "邮箱格式无效，请重新输入。"
@@ -851,7 +896,7 @@ collect_hy2_certificate_settings() {
         HY2_DRAFT_SNI="${HY2_DRAFT_DOMAIN}"
         HY2_DRAFT_INSECURE="false"
     else
-        pick_self_signed_sni
+        pick_self_signed_sni || return 1
         HY2_DRAFT_SNI="${PICKED_SNI}"
         if ! is_valid_domain "${HY2_DRAFT_SNI}"; then
             err "SNI 域名格式无效，请输入有效域名。"
@@ -1305,16 +1350,15 @@ render_singbox_full_template() {
 
     public_key_field="$(render_singbox_public_key_field "${insecure}" "${public_key_sha}" "        ")" || return 1
 
-    cat << EOF
-{
-$(render_singbox_http_clients_section)
-$(render_singbox_dns_section)
-$(render_singbox_inbounds_section)
-$(render_singbox_outbounds_section "${json_ip}" "${port}" "${up_mbps}" "${down_mbps}" "${json_password}" "${json_sni}" "${insecure}" "${public_key_field}")
-$(render_singbox_route_section)
-$(render_singbox_experimental_section)
-}
-EOF
+    # 校验证书固定材料后顺序输出；调用方必须检查返回码，不得发布失败的部分输出。
+    printf '{\n' || return 1
+    render_singbox_http_clients_section || return 1
+    render_singbox_dns_section || return 1
+    render_singbox_inbounds_section || return 1
+    render_singbox_outbounds_section "${json_ip}" "${port}" "${up_mbps}" "${down_mbps}" "${json_password}" "${json_sni}" "${insecure}" "${public_key_field}" || return 1
+    render_singbox_route_section || return 1
+    render_singbox_experimental_section || return 1
+    printf '}\n'
 }
 
 # shellcheck shell=bash
@@ -1585,6 +1629,7 @@ restore_panel_backup() {
 }
 
 update_panel_script() {
+    local confirm
     clear
     print_line
     echo -e "             ${_green}--- 更新管理面板脚本 ---${_plain}"
@@ -1592,7 +1637,7 @@ update_panel_script() {
     echo -e "当前版本: ${_yellow}${sh_ver}${_plain}"
     echo -e "目标路径: ${_yellow}${PANEL_TARGET_BIN}${_plain}"
     print_line
-    read -r -p " => 确认从 GitHub 拉取最新面板脚本并覆盖本地 hy2？(y/n): " confirm
+    read_input " => 确认从 GitHub 拉取最新面板脚本并覆盖本地 hy2？(y/n): " confirm || return 1
     if [[ "${confirm}" != "y" && "${confirm}" != "Y" ]]; then
         msg "已取消更新。"
         sleep 1
@@ -1609,7 +1654,7 @@ update_panel_script() {
     }
 
     msg "正在下载最新管理面板脚本..."
-    if ! curl -fL --retry 2 --connect-timeout 8 -o "${tmp_file}" "${PANEL_UPDATE_URL}" >/dev/null 2>&1; then
+    if ! download_script "${PANEL_UPDATE_URL}" "${tmp_file}"; then
         rm -f "${tmp_file}"
         err "下载失败，请检查网络或稍后重试。"
         sleep 2
@@ -1662,7 +1707,7 @@ show_update_menu() {
     print_line
 
     local action
-    read -r -p " => 请选择操作 [0-2]: " action
+    read_input " => 请选择操作 [0-2]: " action || return 0
     case "${action}" in
         1)
             install_hy2_core
@@ -1797,7 +1842,7 @@ diagnostic_check_runtime_files() {
             "菜单 (1) 配置 Hysteria2 节点 (CA / 自签)"
     fi
 
-    if [[ -f "${HY2_META_FILE}" ]] && read_meta_info; then
+    if read_meta_info; then
         diagnostic_print_result "OK" "节点元数据存在且可解析。"
     else
         diagnostic_print_result "WARN" "节点元数据缺失或损坏，建议重新执行菜单 (1)。"
@@ -2140,6 +2185,7 @@ restore_latest_manual_backup() {
 # 职责: 手动备份与恢复菜单编排
 
 show_backup_restore_menu() {
+    local action
     while true; do
         clear
         print_line
@@ -2150,7 +2196,7 @@ show_backup_restore_menu() {
         echo -e "    (3) 查看手动备份列表"
         echo -e "    (0) 返回主菜单"
         print_line
-        read -r -p " => 请选择操作 [0-3]: " action
+        read_input " => 请选择操作 [0-3]: " action || return 0
 
         case "${action}" in
             1)
@@ -2174,74 +2220,81 @@ show_backup_restore_menu() {
 }
 
 # shellcheck shell=bash
-# 职责: 主菜单渲染与操作分派
+# 职责: 主菜单渲染、操作分派与交互循环；状态每次重绘实时获取
+
+render_main_menu() {
+    clear
+    print_line
+    echo -e "  ${_green}hy2ctl 管理面板 ${sh_ver} |  快捷启动: hy2${_plain}"
+    print_line
+
+    local status="${_red}未运行${_plain}"
+    local core_version="未安装"
+    if command -v hysteria &> /dev/null; then
+        core_version="$(get_hy2_core_version 2>/dev/null || true)"
+        [[ -z "$core_version" ]] && core_version="未知版本"
+
+        if systemctl is-active --quiet "${HY2_SERVICE}"; then
+            status="${_green}运行中${_plain}"
+        fi
+    fi
+
+    echo -e "  内核版本: ${core_version}    服务状态: ${status}"
+    print_sub_line
+    echo -e "  节点核心管理"
+    echo -e "    (1)  节点配置（CA / 自签）"
+    echo -e "    (2)  客户端配置与分享"
+    echo -e ""
+    echo -e "  服务运行控制"
+    echo -e "    (3)  服务启动与控制"
+    echo -e "    (4)  实时运行日志"
+    echo -e "    (5)  完全卸载清理"
+    echo -e "    (6)  常用指令速查"
+    echo -e "    (7)  Sing-box 完整模板"
+    echo -e "    (8)  一键环境诊断"
+    echo -e "    (9)  最近诊断报告"
+    echo -e "    (10) 配置备份与恢复"
+    echo -e "    (11) 面板与内核更新"
+    echo -e "    (0)  退出面板"
+    print_line
+}
+
+dispatch_main_menu() {
+    case "$1" in
+        1) config_hy2 ;;
+        2) show_info ;;
+        3)
+            if ensure_hy2_core_installed; then
+                service_control_menu
+            else
+                sleep 2
+            fi
+            ;;
+        4)
+            if ensure_hy2_core_installed; then
+                journalctl -u "${HY2_SERVICE}" --no-pager -n 100 -f
+            else
+                sleep 2
+            fi
+            ;;
+        5) uninstall_hy2 ;;
+        6) show_cheatsheet ;;
+        7) show_singbox_template ;;
+        8) show_diagnostics ;;
+        9) show_latest_diagnostics_report ;;
+        10) show_backup_restore_menu ;;
+        11) show_update_menu ;;
+        *) err "输入错误"; sleep 1 ;;
+    esac
+}
 
 main_menu() {
+    local menu_num
     while true; do
-        clear
-        print_line
-        echo -e "  ${_green}hy2ctl 管理面板 ${sh_ver} |  快捷启动: hy2${_plain}"
-        print_line
-
-        local status="${_red}未运行${_plain}"
-        local core_version="未安装"
-        if command -v hysteria &> /dev/null; then
-            core_version="$(get_hy2_core_version 2>/dev/null || true)"
-            [[ -z "$core_version" ]] && core_version="未知版本"
-
-            if systemctl is-active --quiet "${HY2_SERVICE}"; then
-                status="${_green}运行中${_plain}"
-            fi
-        fi
-
-        echo -e "  内核版本: ${core_version}    服务状态: ${status}"
-        print_sub_line
-        echo -e "  节点核心管理"
-        echo -e "    (1)  节点配置（CA / 自签）"
-        echo -e "    (2)  客户端配置与分享"
-        echo -e ""
-        echo -e "  服务运行控制"
-        echo -e "    (3)  服务启动与控制"
-        echo -e "    (4)  实时运行日志"
-        echo -e "    (5)  完全卸载清理"
-        echo -e "    (6)  常用指令速查"
-        echo -e "    (7)  Sing-box 完整模板"
-        echo -e "    (8)  一键环境诊断"
-        echo -e "    (9)  最近诊断报告"
-        echo -e "    (10) 配置备份与恢复"
-        echo -e "    (11) 面板与内核更新"
-        echo -e "    (0)  退出面板"
-        print_line
-
-        read -r -p " => 请选择操作 [0-11]: " menu_num
-
-        case "${menu_num}" in
-            1) config_hy2 ;;
-            2) show_info ;;
-            3)
-                if ensure_hy2_core_installed; then
-                    service_control_menu
-                else
-                    sleep 2
-                fi
-                ;;
-            4)
-                if ensure_hy2_core_installed; then
-                    journalctl -u "${HY2_SERVICE}" --no-pager -n 100 -f
-                else
-                    sleep 2
-                fi
-                ;;
-            5) uninstall_hy2 ;;
-            6) show_cheatsheet ;;
-            7) show_singbox_template ;;
-            8) show_diagnostics ;;
-            9) show_latest_diagnostics_report ;;
-            10) show_backup_restore_menu ;;
-            11) show_update_menu ;;
-            0) exit 0 ;;
-            *) err "输入错误"; sleep 1 ;;
-        esac
+        render_main_menu
+        read_input " => 请选择操作 [0-11]: " menu_num || return 0
+        [[ "${menu_num}" == "0" ]] && return 0
+        dispatch_main_menu "${menu_num}"
     done
 }
 

@@ -1,11 +1,11 @@
 # shellcheck shell=bash
 # 职责: 终端消息与基础界面输出
 
-msg() { echo -e "${_blue}[信息]${_plain} $1"; }
+msg() { printf '%b[信息]%b %s\n' "${_blue}" "${_plain}" "$1"; }
 
-ok() { echo -e "${_green}[成功]${_plain} $1"; }
+ok() { printf '%b[成功]%b %s\n' "${_green}" "${_plain}" "$1"; }
 
-err() { echo -e "${_red}[错误]${_plain} $1"; }
+err() { printf '%b[错误]%b %s\n' "${_red}" "${_plain}" "$1"; }
 
 print_line() { echo -e "${_blue}=====================================================${_plain}"; }
 

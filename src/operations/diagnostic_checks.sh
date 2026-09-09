@@ -59,7 +59,7 @@ diagnostic_check_runtime_files() {
             "菜单 (1) 配置 Hysteria2 节点 (CA / 自签)"
     fi
 
-    if [[ -f "${HY2_META_FILE}" ]] && read_meta_info; then
+    if read_meta_info; then
         diagnostic_print_result "OK" "节点元数据存在且可解析。"
     else
         diagnostic_print_result "WARN" "节点元数据缺失或损坏，建议重新执行菜单 (1)。"

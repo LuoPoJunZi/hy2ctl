@@ -8,7 +8,7 @@ write_ca_config() {
     local password="$4"
     local masquerade_url="$5"
 
-    cat << EOF | write_file_atomic "${HY2_CONF_FILE}"
+    write_file_atomic "${HY2_CONF_FILE}" << EOF
 listen: :${port}
 acme:
   domains:
@@ -30,7 +30,7 @@ write_self_signed_config() {
     local password="$2"
     local masquerade_url="$3"
 
-    cat << EOF | write_file_atomic "${HY2_CONF_FILE}"
+    write_file_atomic "${HY2_CONF_FILE}" << EOF
 listen: :${port}
 tls:
   cert: ${HY2_CONF_DIR}/server.crt

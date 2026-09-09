@@ -24,11 +24,21 @@ url_encode() {
 
 json_escape() {
     local s="$1"
+    local code char escaped
     s="${s//\\/\\\\}"
     s="${s//\"/\\\"}"
     s="${s//$'\n'/\\n}"
     s="${s//$'\r'/\\r}"
     s="${s//$'\t'/\\t}"
+    # 常见字符串保留快速路径；其余 U+0001..U+001F 也必须转义为合法 JSON。
+    # Bash 字符串无法保存 NUL，因此不接受/不宣称支持 U+0000 输入。
+    if [[ "${s}" == *[$'\001'-$'\037']* ]]; then
+        for ((code = 1; code < 32; code++)); do
+            printf -v escaped '\\u%04x' "${code}"
+            printf -v char '%b' "${escaped}"
+            s="${s//"${char}"/"${escaped}"}"
+        done
+    fi
     printf '%s' "${s}"
 }
 

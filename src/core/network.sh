@@ -1,5 +1,11 @@
 # shellcheck shell=bash
-# 职责: 服务器公网地址发现
+# 职责: 有界脚本下载与服务器公网地址发现
+
+# target 由调用方通过 mktemp 创建；失败后的删除、校验与替换仍由调用方负责。
+download_script() {
+    curl -fL --retry 2 --connect-timeout 8 --max-time 120 \
+        -o "$2" "$1" >/dev/null 2>&1
+}
 
 fetch_server_ip() {
     local ip

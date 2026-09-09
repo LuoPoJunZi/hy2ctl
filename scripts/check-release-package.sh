@@ -48,6 +48,7 @@ check_required_paths() {
     assert_list_contains "${list_file}" "src/bootstrap.sh"
     assert_list_contains "${list_file}" "src/main.sh"
     assert_list_contains "${list_file}" "src/core/output.sh"
+    assert_list_contains "${list_file}" "src/core/input.sh"
     assert_list_contains "${list_file}" "src/core/environment.sh"
     assert_list_contains "${list_file}" "src/core/validation.sh"
     assert_list_contains "${list_file}" "src/core/encoding.sh"
@@ -85,6 +86,7 @@ check_required_paths() {
     assert_list_contains "${list_file}" "src/operations/backup.sh"
     assert_list_contains "${list_file}" "scripts/build-panel.sh"
     assert_list_contains "${list_file}" "scripts/verify.sh"
+    assert_list_contains "${list_file}" "scripts/benchmark.sh"
     assert_list_contains "${list_file}" "scripts/check-style.sh"
     assert_list_contains "${list_file}" "scripts/check-menu-sync.sh"
     assert_list_contains "${list_file}" "scripts/check-brand-sync.sh"
@@ -94,6 +96,7 @@ check_required_paths() {
     assert_list_contains "${list_file}" "tests/unit/hy2_core.bats"
     assert_list_contains "${list_file}" "tests/e2e/config-flow.sh"
     assert_list_contains "${list_file}" "tests/e2e/client-render.sh"
+    assert_list_contains "${list_file}" "tests/e2e/runtime-contracts.sh"
 }
 
 check_local_only_paths_absent() {

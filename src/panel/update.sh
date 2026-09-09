@@ -39,6 +39,7 @@ restore_panel_backup() {
 }
 
 update_panel_script() {
+    local confirm
     clear
     print_line
     echo -e "             ${_green}--- 更新管理面板脚本 ---${_plain}"
@@ -46,7 +47,7 @@ update_panel_script() {
     echo -e "当前版本: ${_yellow}${sh_ver}${_plain}"
     echo -e "目标路径: ${_yellow}${PANEL_TARGET_BIN}${_plain}"
     print_line
-    read -r -p " => 确认从 GitHub 拉取最新面板脚本并覆盖本地 hy2？(y/n): " confirm
+    read_input " => 确认从 GitHub 拉取最新面板脚本并覆盖本地 hy2？(y/n): " confirm || return 1
     if [[ "${confirm}" != "y" && "${confirm}" != "Y" ]]; then
         msg "已取消更新。"
         sleep 1
@@ -63,7 +64,7 @@ update_panel_script() {
     }
 
     msg "正在下载最新管理面板脚本..."
-    if ! curl -fL --retry 2 --connect-timeout 8 -o "${tmp_file}" "${PANEL_UPDATE_URL}" >/dev/null 2>&1; then
+    if ! download_script "${PANEL_UPDATE_URL}" "${tmp_file}"; then
         rm -f "${tmp_file}"
         err "下载失败，请检查网络或稍后重试。"
         sleep 2
@@ -116,7 +117,7 @@ show_update_menu() {
     print_line
 
     local action
-    read -r -p " => 请选择操作 [0-2]: " action
+    read_input " => 请选择操作 [0-2]: " action || return 0
     case "${action}" in
         1)
             install_hy2_core

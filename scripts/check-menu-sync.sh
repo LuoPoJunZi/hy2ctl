@@ -19,6 +19,8 @@ assert_contains() {
 }
 
 assert_contains "src/panel/menu.sh" "=> 请选择操作 [0-11]:" "menu source range mismatch"
+assert_contains "src/panel/menu.sh" "render_main_menu()" "menu render boundary missing"
+assert_contains "src/panel/menu.sh" "dispatch_main_menu()" "menu dispatch boundary missing"
 assert_contains "src/panel/menu.sh" "快捷启动: hy2" "menu source quick launch label mismatch"
 assert_contains "src/panel/menu.sh" "内核版本:" "menu source status label mismatch"
 assert_contains "src/panel/menu.sh" "print_sub_line" "menu source status separator mismatch"
