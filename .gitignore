@@ -1,5 +1,41 @@
-PROJECT_MEMORY.md
+# Local-only project and agent notes
 AGENTS.md
-LOCAL_WORK_MEMORY.md
+LOCAL_*.md
+PROJECT_MEMORY.md
+
+# Local validation worktrees and archives
 .codex-ci-check*/
 .codex-ci-check*.tar
+
+# Runtime configuration and credential material
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx
+/config.yaml
+/meta.info
+/server.crt
+/server.key
+
+# Generated release artifacts
+/code.tar.gz
+/SHA256SUMS
+/RELEASE_BODY.md
+
+# Editor, operating-system and temporary files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+*.tmp
+*.temp
+*.orig
+*.rej
+__pycache__/
+*.py[cod]

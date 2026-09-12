@@ -30,11 +30,20 @@ assert_list_not_contains() {
 
 check_forbidden_paths() {
     local list_file="$1"
+    if grep -Eq '(^|/)(AGENTS\.md|LOCAL_[^/]*\.md|PROJECT_MEMORY\.md)$' "${list_file}"; then
+        fail "Release package contains local-only project notes."
+    fi
     if grep -Eq '(^|/)lib/hy2(/|$)|(^|/)scripts/measure-memory\.sh$' "${list_file}"; then
         fail "Release package contains reverted PR #2 modular files."
     fi
     if grep -Eq '(^|/)\.codex-ci-check|(^|/)\.codex-ci-check.*\.tar$' "${list_file}"; then
         fail "Release package contains local Codex check artifacts."
+    fi
+    if grep -Eq '(^|/)(\.env(\.[^/]*)?|config\.yaml|meta\.info|server\.crt|server\.key|[^/]+\.(key|pem|p12|pfx))$' "${list_file}"; then
+        fail "Release package contains runtime configuration or credential material."
+    fi
+    if grep -Eq '(^|/)(code\.tar\.gz|SHA256SUMS|RELEASE_BODY\.md)$' "${list_file}"; then
+        fail "Release package contains generated release artifacts."
     fi
 }
 
@@ -68,6 +77,7 @@ check_required_paths() {
 check_local_only_paths_absent() {
     local list_file="$1"
     assert_list_not_contains "${list_file}" "AGENTS.md"
+    assert_list_not_contains "${list_file}" "LOCAL_BLOG_TUTORIAL.md"
     assert_list_not_contains "${list_file}" "LOCAL_WORK_MEMORY.md"
     assert_list_not_contains "${list_file}" "PROJECT_MEMORY.md"
     assert_list_not_contains "${list_file}" ".github/workflows/lint.yml"
@@ -88,9 +98,6 @@ check_tracked_tree() {
     fi
     check_required_paths "${list_file}"
     check_forbidden_paths "${list_file}"
-    assert_list_not_contains "${list_file}" "AGENTS.md"
-    assert_list_not_contains "${list_file}" "LOCAL_WORK_MEMORY.md"
-    assert_list_not_contains "${list_file}" "PROJECT_MEMORY.md"
     rm -f "${list_file}"
 }
 

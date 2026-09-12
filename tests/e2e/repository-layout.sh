@@ -62,12 +62,15 @@ test_release_archive() (
         fail 'Release accepted missing test helpers'
     fi
     assert_contains_file "${TEST_TMP_DIR}/archive.log" tests/helpers 'Archive failure did not identify helpers'
-    printf 'local-only fixture\n' > "${TEST_TMP_DIR}/AGENTS.md"
-    tar -czf "${archive}" "${files[@]}" -C "${TEST_TMP_DIR}" AGENTS.md
-    if bash scripts/check-release-package.sh "${archive}" > "${TEST_TMP_DIR}/archive.log" 2>&1; then
-        fail 'Release accepted a local-only file'
-    fi
-    assert_contains_file "${TEST_TMP_DIR}/archive.log" AGENTS.md 'Archive failure did not identify local file'
+    local local_path
+    for local_path in AGENTS.md LOCAL_BLOG_TUTORIAL.md PROJECT_MEMORY.md .env server.key code.tar.gz; do
+        printf 'local-only fixture\n' > "${TEST_TMP_DIR}/${local_path}"
+        tar -czf "${archive}" "${files[@]}" -C "${TEST_TMP_DIR}" "${local_path}"
+        if bash scripts/check-release-package.sh "${archive}" > "${TEST_TMP_DIR}/archive.log" 2>&1; then
+            fail "Release accepted forbidden file: ${local_path}"
+        fi
+        rm -f "${TEST_TMP_DIR:?}/${local_path}"
+    done
     echo '[OK] Release archive includes helpers/fixtures/docs and rejects local-only files.'
 )
 
