@@ -47,6 +47,39 @@ source "${BATS_TEST_DIRNAME}/../helpers/bats-setup.sh"
   grep -Fq "[建议] first suggestion" "${HY2_DIAG_LATEST}"
 }
 
+@test "core diagnostics should distinguish security risk from recommended updates" {
+  hysteria() { :; }
+
+  get_hy2_core_version() { printf 'v2.8.1\n'; }
+  diagnostic_reset_context
+  diagnostic_check_core > "${TEST_TMP_DIR}/core-diagnostic.out"
+  output="$(<"${TEST_TMP_DIR}/core-diagnostic.out")"
+  [ "${DIAG_WARN_COUNT}" -eq 1 ]
+  [ "${DIAG_OK_COUNT}" -eq 0 ]
+  [[ "${output}" == *"低于安全基线 v${HY2_SECURITY_BASELINE_VERSION}"* ]]
+  [[ "${DIAG_CONCLUSIONS[0]}" == *"高危安全风险"* ]]
+  [[ "${DIAG_SUGGESTIONS[0]}" == *"立即更新到 v${RECOMMENDED_HY2_VERSION}"* ]]
+
+  get_hy2_core_version() { printf 'v2.9.2\n'; }
+  diagnostic_reset_context
+  diagnostic_check_core > "${TEST_TMP_DIR}/core-diagnostic.out"
+  output="$(<"${TEST_TMP_DIR}/core-diagnostic.out")"
+  [ "${DIAG_WARN_COUNT}" -eq 1 ]
+  [ "${DIAG_OK_COUNT}" -eq 0 ]
+  [[ "${output}" == *"低于建议版本 v${RECOMMENDED_HY2_VERSION}"* ]]
+  [[ "${output}" != *"高危安全风险"* ]]
+  [ "${DIAG_CONCLUSIONS[0]}" = "Hysteria2 内核版本较旧。" ]
+
+  get_hy2_core_version() { printf 'v2.12.2\n'; }
+  diagnostic_reset_context
+  diagnostic_check_core > "${TEST_TMP_DIR}/core-diagnostic.out"
+  output="$(<"${TEST_TMP_DIR}/core-diagnostic.out")"
+  [ "${DIAG_OK_COUNT}" -eq 1 ]
+  [ "${DIAG_WARN_COUNT}" -eq 0 ]
+  [[ "${output}" == *"Hysteria2 内核版本: v2.12.2"* ]]
+  [ "${#DIAG_CONCLUSIONS[@]}" -eq 0 ]
+}
+
 @test "show_service_failure_hint should classify permission denied logs" {
   journalctl() {
     cat "${TEST_FIXTURE_DIR}/logs/permission-denied.log"

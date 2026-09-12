@@ -27,6 +27,7 @@ PANEL_UPDATE_URL="https://raw.githubusercontent.com/LuoPoJunZi/hy2ctl/main/hy2.s
 PANEL_TARGET_BIN="/usr/local/bin/hy2"
 PANEL_BACKUP_PREFIX="/usr/local/bin/hy2.bak"
 HY2_INSTALL_URL="https://get.hy2.sh/"
+HY2_SECURITY_BASELINE_VERSION="2.9.2"
 RECOMMENDED_HY2_VERSION="2.12.2"
 DEFAULT_PORT=8443
 DEFAULT_MASQUERADE_URL="https://bing.com"

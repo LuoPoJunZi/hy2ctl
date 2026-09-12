@@ -8,6 +8,12 @@ diagnostic_check_core() {
         core_version="$(get_hy2_core_version 2>/dev/null || true)"
         if [[ -z "${core_version}" ]]; then
             diagnostic_print_result "WARN" "已检测到 Hysteria2 内核，但无法读取版本。"
+        elif ! version_at_least "${core_version}" "${HY2_SECURITY_BASELINE_VERSION}"; then
+            diagnostic_print_result "WARN" "Hysteria2 内核版本 ${core_version} 低于安全基线 v${HY2_SECURITY_BASELINE_VERSION}，存在高危安全风险。"
+            diagnostic_add_item \
+                "Hysteria2 内核版本存在高危安全风险。" \
+                "立即更新到 v${RECOMMENDED_HY2_VERSION} 或更高版本，避免旧版本中的访问控制绕过与拒绝服务风险。" \
+                "菜单 (11) -> 安装/更新 Hysteria2 内核"
         elif version_at_least "${core_version}" "${RECOMMENDED_HY2_VERSION}"; then
             diagnostic_print_result "OK" "Hysteria2 内核版本: ${core_version}。"
         else

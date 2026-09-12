@@ -35,6 +35,8 @@ version_at_least "v2.12.2" "${RECOMMENDED_HY2_VERSION}" || fail "equal versions 
 version_at_least "2.13.0" "${RECOMMENDED_HY2_VERSION}" || fail "newer version should satisfy minimum"
 ! version_at_least "2.12.1" "${RECOMMENDED_HY2_VERSION}" || fail "older version should not satisfy minimum"
 ! version_at_least "invalid" "${RECOMMENDED_HY2_VERSION}" || fail "invalid version should be rejected"
+version_at_least "2.9.2" "${HY2_SECURITY_BASELINE_VERSION}" || fail "security baseline should satisfy minimum"
+! version_at_least "2.9.1" "${HY2_SECURITY_BASELINE_VERSION}" || fail "version below security baseline should be rejected"
 
 echo "[INFO] Running config generation checks..."
 write_self_signed_config "443" "pa'ss" "https://example.com"

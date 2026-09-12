@@ -231,7 +231,7 @@ hy2
 3. 菜单 `4` 查看实时日志
 
 菜单 `8` 会在结果末尾给出结构化排障建议：`结论 + 建议 + 命令`，可直接按命令执行。
-诊断还会检查 Hysteria2 内核版本；低于 `v2.12.2` 时会提示通过菜单 `11` 更新，以获得移动端快速重连、IPv6 mimic 和小 MTU 稳定性修复。
+诊断还会分级检查 Hysteria2 内核版本：低于 `v2.9.2` 时会标记为高危安全风险并提示立即通过菜单 `11` 更新；`v2.9.2` 至 `v2.12.1` 会提示更新，以获得移动端快速重连、IPv6 mimic 和小 MTU 稳定性修复。安全基线依据 Hysteria 官方[安全公告](https://github.com/HyNetworks/hysteria/security/advisories)。
 
 Hysteria2 2.12.2 增加了 `quic.disableStatelessReset` 作为兼容性开关。面板不会默认写入该选项，保持 Stateless Reset 启用，以保留移动端休眠后的快速重连能力；只有确认特定网络环境与 Stateless Reset 冲突时，才建议手动设为 `true` 进行排障。
 
