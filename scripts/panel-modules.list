@@ -4,6 +4,7 @@ src/core/output.sh
 src/core/input.sh
 src/core/environment.sh
 src/core/validation.sh
+src/core/ip.sh
 src/core/encoding.sh
 src/core/files.sh
 src/core/network.sh

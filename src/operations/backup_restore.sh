@@ -85,16 +85,18 @@ restore_latest_manual_backup() {
 
     set_manual_restore_permissions "${backup_uses_tls}"
 
-    if systemctl restart "${HY2_SERVICE}" >/dev/null 2>&1; then
+    if restart_hy2_service_checked >/dev/null 2>&1; then
         ok "已恢复最近备份并重启服务: ${latest_dir}"
         return 0
     fi
 
-    err "备份文件已恢复，但服务重启失败，正在回滚到操作前配置..."
-    if restore_runtime_files && systemctl restart "${HY2_SERVICE}" >/dev/null 2>&1; then
+    err "备份文件已恢复，但服务重启失败或未保持运行，正在回滚到操作前配置..."
+    show_service_failure_hint
+    if restore_runtime_files && restart_hy2_service_checked >/dev/null 2>&1; then
         err "已恢复操作前配置，本次手动恢复未生效。"
     else
         err "自动回滚失败，请立即检查配置与服务日志。"
     fi
+    show_recent_service_logs
     return 1
 }

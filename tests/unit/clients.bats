@@ -69,6 +69,7 @@ source "${BATS_TEST_DIRNAME}/../helpers/bats-setup.sh"
   [[ "${output}" == *"pcs"* ]]
   [[ "${output}" == *"Xray-core >= 26.2.6"* ]]
   [[ "${output}" == *"v2rayN >= 7.24.9"* ]]
+  [[ "${output}" == *"v2rayN >= 7.25.4"* ]]
   [[ "${output}" == *"Sing-box >= 1.13.0"* ]]
   [[ "${output}" == *"pinnedPeerCertSha256"* ]]
   [[ "${output}" == *"已移除 allowInsecure"* ]]

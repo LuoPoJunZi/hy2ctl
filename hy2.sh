@@ -8,7 +8,7 @@
 # 交互式主面板不启用全局 errexit，各外部命令在对应流程中显式处理失败与回滚。
 
 # --- 1. 全局变量与颜色输出 ---
-sh_ver="v26.9.9"
+sh_ver="v26.10.1"
 
 _red="\033[0;31m"
 _green="\033[0;32m"
@@ -28,7 +28,7 @@ PANEL_TARGET_BIN="/usr/local/bin/hy2"
 PANEL_BACKUP_PREFIX="/usr/local/bin/hy2.bak"
 HY2_INSTALL_URL="https://get.hy2.sh/"
 HY2_SECURITY_BASELINE_VERSION="2.9.2"
-RECOMMENDED_HY2_VERSION="2.12.2"
+RECOMMENDED_HY2_VERSION="2.12.3"
 DEFAULT_PORT=8443
 DEFAULT_MASQUERADE_URL="https://bing.com"
 DEFAULT_SELF_SNI="bing.com"
@@ -168,6 +168,101 @@ is_valid_email() {
 }
 
 # shellcheck shell=bash
+# 职责: 纯 Bash IPv4/IPv6 格式校验与公网候选地址筛选；不证明实际连通性
+
+is_valid_ipv4() {
+    local address="$1" octet
+    local -a octets=()
+    [[ "${address}" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || return 1
+    IFS=. read -r -a octets <<< "${address}"
+    for octet in "${octets[@]}"; do
+        [[ "${octet}" == 0 || "${octet}" != 0* ]] || return 1
+        (( 10#${octet} <= 255 )) || return 1
+    done
+}
+
+expand_ipv6_address() {
+    local address="${1,,}" tail left right group zeros expanded=""
+    local group_pattern='[0-9a-f]{1,4}(:[0-9a-f]{1,4})*'
+    local -a left_groups=() right_groups=() groups=() octets=()
+    [[ ${#address} -le 45 && "${address}" == *:* && "${address}" =~ ^[0-9a-f:.]+$ ]] || return 1
+    if [[ "${address}" == *.* ]]; then
+        tail="${address##*:}"
+        is_valid_ipv4 "${tail}" || return 1
+        IFS=. read -r -a octets <<< "${tail}"
+        printf -v tail '%x:%x' "$((10#${octets[0]} * 256 + 10#${octets[1]}))" "$((10#${octets[2]} * 256 + 10#${octets[3]}))"
+        address="${address%:*}:${tail}"
+    fi
+    if [[ "${address}" == *::* ]]; then
+        left="${address%%::*}"
+        right="${address#*::}"
+        [[ -z "${left}" || "${left}" =~ ^${group_pattern}$ ]] || return 1
+        [[ -z "${right}" || "${right}" =~ ^${group_pattern}$ ]] || return 1
+        IFS=: read -r -a left_groups <<< "${left}"
+        IFS=: read -r -a right_groups <<< "${right}"
+        zeros=$((8 - ${#left_groups[@]} - ${#right_groups[@]}))
+        (( zeros > 0 )) || return 1
+        groups=("${left_groups[@]}")
+        while (( zeros > 0 )); do groups+=(0); zeros=$((zeros - 1)); done
+        groups+=("${right_groups[@]}")
+    else
+        [[ "${address}" =~ ^${group_pattern}$ ]] || return 1
+        IFS=: read -r -a groups <<< "${address}"
+        (( ${#groups[@]} == 8 )) || return 1
+    fi
+    # 完成校验后才输出，避免调用方使用部分展开结果。
+    for group in "${groups[@]}"; do
+        printf -v group '%04x' "$((16#${group}))"
+        expanded+="${expanded:+:}${group}"
+    done
+    printf '%s\n' "${expanded}"
+}
+
+is_valid_ip() {
+    is_valid_ipv4 "$1" || expand_ipv6_address "$1" >/dev/null
+}
+
+is_public_ip() {
+    local address="$1" expanded first second third index
+    local -a parts=()
+    if is_valid_ipv4 "${address}"; then
+        IFS=. read -r -a parts <<< "${address}"
+        first="${parts[0]}"; second="${parts[1]}"; third="${parts[2]}"
+        # IANA 特殊用途：私网、CGNAT、回环、链路本地、文档、测试、组播及保留地址。
+        (( first != 0 && first != 10 && first != 127 && first < 224 )) || return 1
+        (( first != 100 || second < 64 || second > 127 )) || return 1
+        (( first != 169 || second != 254 )) || return 1
+        (( first != 172 || second < 16 || second > 31 )) || return 1
+        (( first != 192 || second != 168 )) || return 1
+        if (( first == 192 && second == 0 )); then
+            (( (third != 0 && third != 2) || (third == 0 && (parts[3] == 9 || parts[3] == 10)) )) || return 1
+        fi
+        (( first != 192 || second != 88 || third != 99 )) || return 1
+        (( first != 198 || (second != 18 && second != 19) )) || return 1
+        (( first != 198 || second != 51 || third != 100 )) || return 1
+        (( first != 203 || second != 0 || third != 113 )) || return 1
+        return 0
+    fi
+    expanded="$(expand_ipv6_address "${address}")" || return 1
+    IFS=: read -r -a parts <<< "${expanded}"
+    for index in "${!parts[@]}"; do parts[index]="$((16#${parts[index]}))"; done
+    first="${parts[0]}"; second="${parts[1]}"; third="${parts[2]}"
+    # NAT64 标准前缀；嵌入的 IPv4 地址也必须是公网候选。
+    if (( first == 0x64 && second == 0xff9b && (third | parts[3] | parts[4] | parts[5]) == 0 )); then
+        is_public_ip "$((parts[6] >> 8)).$((parts[6] & 255)).$((parts[7] >> 8)).$((parts[7] & 255))"
+        return
+    fi
+    (( first >= 0x2000 && first <= 0x3fff )) || return 1
+    (( first != 0x2001 || second != 0xdb8 )) || return 1
+    (( first != 0x3fff || second >= 0x1000 )) || return 1
+    if (( first == 0x2001 && second < 0x200 )); then
+        (( second == 0 || second == 3 || (second == 4 && third == 0x112) || (second >= 0x20 && second <= 0x3f) )) && return 0
+        (( second == 1 && (third | parts[3] | parts[4] | parts[5] | parts[6]) == 0 && parts[7] >= 1 && parts[7] <= 3 )) || return 1
+    fi
+    return 0
+}
+
+# shellcheck shell=bash
 # 职责: YAML、URL、JSON 与主机地址编码
 
 yaml_single_quote() {
@@ -231,7 +326,8 @@ write_file_atomic() {
         rm -f "${tmp_file}" >/dev/null 2>&1 || true
         return 1
     fi
-    if ! mv -f "${tmp_file}" "${target}"; then
+    # -T 禁止把目录（含指向目录的链接）误当作移动目的目录。
+    if ! mv -fT -- "${tmp_file}" "${target}"; then
         rm -f "${tmp_file}" >/dev/null 2>&1 || true
         return 1
     fi
@@ -247,16 +343,45 @@ download_script() {
         -o "$2" "$1" >/dev/null 2>&1
 }
 
+fetch_public_ip() {
+    local candidate family url
+    local LC_ALL=C
+    for family in 4 6; do
+        if [[ "${family}" == 4 ]]; then url='https://api.ipify.org'; else url='https://api64.ipify.org'; fi
+        if candidate="$(curl -fsS"${family}" --connect-timeout 3 --max-time 6 --max-filesize 128 "${url}" 2>/dev/null)"; then
+            # 旧版 curl 对未知长度响应不执行 max-filesize，结果仍必须受长度约束。
+            (( ${#candidate} <= 128 )) || continue
+            # 允许服务响应末尾换行/CRLF，不接受多行或嵌入字段。
+            candidate="${candidate#"${candidate%%[![:space:]]*}"}"
+            candidate="${candidate%"${candidate##*[![:space:]]}"}"
+            if is_public_ip "${candidate}"; then
+                printf '%s\n' "${candidate}"
+                return 0
+            fi
+        fi
+    done
+    return 1
+}
+
+fetch_local_ip() {
+    local addresses candidate fallback=""
+    local -a candidates=()
+    addresses="$(hostname -I 2>/dev/null)" || return 1
+    read -r -a candidates <<< "${addresses}"
+    for candidate in "${candidates[@]}"; do
+        is_valid_ip "${candidate}" || continue
+        if is_public_ip "${candidate}"; then
+            printf '%s\n' "${candidate}"
+            return 0
+        fi
+        [[ -n "${fallback}" ]] || fallback="${candidate}"
+    done
+    [[ -n "${fallback}" ]] || return 1
+    printf '%s\n' "${fallback}"
+}
+
 fetch_server_ip() {
-    local ip
-    ip="$(curl -fsS4 --max-time 6 https://api.ipify.org 2>/dev/null || true)"
-    if [[ -z "${ip}" ]]; then
-        ip="$(curl -fsS6 --max-time 6 https://api64.ipify.org 2>/dev/null || true)"
-    fi
-    if [[ -z "${ip}" ]]; then
-        ip="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
-    fi
-    echo "${ip}"
+    fetch_public_ip || fetch_local_ip
 }
 
 # shellcheck shell=bash
@@ -474,37 +599,96 @@ set_tls_file_permissions() {
 # shellcheck shell=bash
 # 职责: Hysteria2 四文件自动快照、缺失状态与恢复后的权限收敛
 
-backup_runtime_files() {
-    local name source_file backup_file absent_marker
+get_runtime_snapshot_dir() {
+    local pointer="${HY2_BACKUP_DIR}/runtime.current"
+    local snapshot_name
+    if [[ -e "${pointer}" || -L "${pointer}" ]]; then
+        [[ -f "${pointer}" && ! -L "${pointer}" ]] || return 1
+        snapshot_name="$(<"${pointer}")" || return 1
+        [[ "${snapshot_name}" =~ ^runtime-[A-Za-z0-9]{6}$ ]] || return 1
+        [[ -d "${HY2_BACKUP_DIR}/${snapshot_name}" && ! -L "${HY2_BACKUP_DIR}/${snapshot_name}" ]] || return 1
+        printf '%s\n' "${HY2_BACKUP_DIR}/${snapshot_name}"
+    else
+        # 升级后仍可恢复旧版平铺的 .bak / .bak.absent 快照。
+        printf '%s\n' "${HY2_BACKUP_DIR}"
+    fi
+}
 
-    mkdir -p "${HY2_BACKUP_DIR}" || return 1
-
+validate_runtime_snapshot_dir() {
+    local snapshot_dir="$1"
+    local name backup_file absent_marker
+    [[ -d "${snapshot_dir}" && ! -L "${snapshot_dir}" ]] || return 1
     for name in "${RUNTIME_FILE_NAMES[@]}"; do
-        backup_file="${HY2_BACKUP_DIR}/${name}.bak"
+        backup_file="${snapshot_dir}/${name}.bak"
         absent_marker="${backup_file}.absent"
-        rm -f -- "${backup_file}" "${absent_marker}" || return 1
+        [[ ! -L "${backup_file}" && ! -L "${absent_marker}" ]] || return 1
+        if [[ -f "${backup_file}" && ! -e "${absent_marker}" ]]; then
+            continue
+        elif [[ -f "${absent_marker}" && ! -e "${backup_file}" ]]; then
+            continue
+        else
+            return 1
+        fi
     done
+}
+
+discard_runtime_snapshot() {
+    local snapshot_dir="$1" name
+    local -a files=()
+    # 仅清理本模块创建的直接子目录及八个已知文件，不递归删除备份根目录。
+    [[ "${snapshot_dir%/*}" == "${HY2_BACKUP_DIR}" && "${snapshot_dir##*/}" =~ ^runtime-[A-Za-z0-9]{6}$ ]] || return 1
+    [[ -d "${snapshot_dir}" && ! -L "${snapshot_dir}" ]] || return 1
+    if [[ -f "${HY2_BACKUP_DIR}/runtime.current" && "$(<"${HY2_BACKUP_DIR}/runtime.current")" == "${snapshot_dir##*/}" ]]; then
+        return 1
+    fi
+    for name in "${RUNTIME_FILE_NAMES[@]}"; do
+        files+=("${snapshot_dir}/${name}.bak" "${snapshot_dir}/${name}.bak.absent")
+    done
+    rm -f -- "${files[@]}" && rm -d -- "${snapshot_dir}"
+}
+
+backup_runtime_files() {
+    local name source_file backup_file snapshot_dir previous_dir
+    local snapshot_failed=0
+    mkdir -p "${HY2_BACKUP_DIR}" || return 1
+    previous_dir="$(get_runtime_snapshot_dir)" || return 1
+    snapshot_dir="$(mktemp -d "${HY2_BACKUP_DIR}/runtime-XXXXXX")" || return 1
 
     for name in "${RUNTIME_FILE_NAMES[@]}"; do
         source_file="${HY2_CONF_DIR}/${name}"
-        backup_file="${HY2_BACKUP_DIR}/${name}.bak"
-        absent_marker="${backup_file}.absent"
-        if [[ -e "${source_file}" ]]; then
-            cp -p -- "${source_file}" "${backup_file}" || return 1
+        backup_file="${snapshot_dir}/${name}.bak"
+        if [[ -f "${source_file}" ]]; then
+            cp -p -- "${source_file}" "${backup_file}" || snapshot_failed=1
+        elif [[ ! -e "${source_file}" && ! -L "${source_file}" ]]; then
+            : > "${backup_file}.absent" || snapshot_failed=1
         else
-            : > "${absent_marker}" || return 1
+            snapshot_failed=1
         fi
+        (( snapshot_failed == 0 )) || break
     done
+
+    if (( snapshot_failed != 0 )) || ! validate_runtime_snapshot_dir "${snapshot_dir}" || \
+        ! write_file_atomic "${HY2_BACKUP_DIR}/runtime.current" <<< "${snapshot_dir##*/}"; then
+        discard_runtime_snapshot "${snapshot_dir}" >/dev/null 2>&1 || true
+        return 1
+    fi
+    # 只有完整新快照发布成功才清理旧的新版快照；旧版平铺文件和手动备份不动。
+    if [[ "${previous_dir}" != "${HY2_BACKUP_DIR}" ]]; then
+        discard_runtime_snapshot "${previous_dir}" >/dev/null 2>&1 || true
+    fi
     return 0
 }
 
 restore_runtime_files() {
-    local name target_file backup_file absent_marker
+    local name target_file backup_file absent_marker snapshot_dir
     local restore_failed=0
+    snapshot_dir="$(get_runtime_snapshot_dir)" || return 1
+    # 四项状态必须完整且互斥；不能恢复到一半才发现快照损坏。
+    validate_runtime_snapshot_dir "${snapshot_dir}" || return 1
 
     for name in "${RUNTIME_FILE_NAMES[@]}"; do
         target_file="${HY2_CONF_DIR}/${name}"
-        backup_file="${HY2_BACKUP_DIR}/${name}.bak"
+        backup_file="${snapshot_dir}/${name}.bak"
         absent_marker="${backup_file}.absent"
         if [[ -f "${backup_file}" ]]; then
             cp -p -- "${backup_file}" "${target_file}" || restore_failed=1
@@ -545,16 +729,17 @@ abort_pending_config_change() {
 }
 
 restart_service_with_rollback() {
-    if systemctl restart "${HY2_SERVICE}"; then
+    if restart_hy2_service_checked; then
         return 0
     fi
-    err "重启服务失败，正在尝试自动回滚到上一版配置..."
+    err "重启服务失败或服务未保持运行，正在尝试自动回滚到上一版配置..."
     show_service_failure_hint
-    if restore_runtime_files && systemctl restart "${HY2_SERVICE}"; then
+    if restore_runtime_files && restart_hy2_service_checked; then
         err "已回滚到上一版配置，本次变更未生效。"
     else
         err "自动回滚失败，请手动检查 ${HY2_CONF_FILE} 和服务日志。"
     fi
+    show_recent_service_logs
     return 1
 }
 
@@ -595,6 +780,13 @@ show_service_failure_hint() {
 
 # shellcheck shell=bash
 # 职责: Hysteria2 服务状态变更；菜单交互位于 panel/service_menu.sh
+
+restart_hy2_service_checked() {
+    systemctl restart "${HY2_SERVICE}" || return 1
+    # Type=simple 的 restart 成功不代表进程未随后退出；与现有配置流程观察窗口一致。
+    sleep 2
+    systemctl is-active --quiet "${HY2_SERVICE}"
+}
 
 change_hy2_service_state() {
     local action="$1"
@@ -940,11 +1132,13 @@ activate_hy2_config() {
     local down_mbps="$6"
     local server_ip
 
-    server_ip="$(fetch_server_ip)"
-    if [[ -z "${server_ip}" ]]; then
+    if ! server_ip="$(fetch_server_ip)" || ! is_valid_ip "${server_ip}"; then
         abort_pending_config_change "无法获取服务器 IP"
         sleep 2
         return 1
+    fi
+    if ! is_public_ip "${server_ip}"; then
+        msg "公网 IP 探测失败，当前使用本机非公网地址 ${server_ip}；NAT/内网部署请确认客户端应连接的地址与端口映射。"
     fi
 
     if ! write_meta_info "${server_ip}" "${port}" "${password}" "${sni}" "${insecure}" "${up_mbps}" "${down_mbps}"; then
@@ -960,22 +1154,7 @@ activate_hy2_config() {
         sleep 2
         return 1
     fi
-    sleep 2
-    if systemctl is-active --quiet "${HY2_SERVICE}"; then
-        ok "Hysteria2 节点配置并启动成功！"
-    else
-        err "启动失败！可能是端口被占用，或 CA 证书申请失败。请使用菜单 (4) 查看日志。"
-        show_service_failure_hint
-        err "检测到服务未保持运行，正在尝试自动回滚到上一版配置..."
-        if restore_runtime_files && systemctl restart "${HY2_SERVICE}"; then
-            err "已自动回滚到上一版配置，本次变更未生效。"
-        else
-            err "自动回滚失败，请手动检查配置与日志。"
-        fi
-        show_recent_service_logs
-        sleep 3
-        return 1
-    fi
+    ok "Hysteria2 节点配置并启动成功！"
     sleep 2
 }
 
@@ -1345,6 +1524,7 @@ show_singbox_template() {
     print_line
     echo -e "     ${_green}--- Sing-box 完整模板 (Android/iOS / 1.14+) ---${_plain}"
     print_line
+    echo -e "${_blue}[兼容]${_plain} 通过 v2rayN 使用 Sing-box 1.14 内核时，建议 v2rayN >= 7.25.4。"
     if ! render_singbox_full_template "${json_ip}" "${port}" "${up_mbps}" "${down_mbps}" "${json_password}" "${json_sni}" "${insecure}" "${cert_public_key_sha}"; then
         err "生成 Sing-box 完整模板失败，请重新配置节点。"
     fi
@@ -1399,6 +1579,7 @@ print_v2rayn_insecure_notice() {
     echo -e "  使用 Xray 时请确保：v2rayN >= 7.17.1，Xray-core >= 26.2.6。"
     echo -e "  请使用 v2rayN >= 7.24.9，以修复旧版下载器的中间人攻击风险。"
     echo -e "  Sing-box 自签配置使用公钥固定，请使用 Sing-box >= 1.13.0。"
+    echo -e "  通过 v2rayN 管理 Sing-box 1.14 内核时，请使用 v2rayN >= 7.25.4。"
     echo -e "  分享链接已移除 allowInsecure，不再依赖已废弃的跳过验证字段。"
     echo -e "  重新生成自签证书后指纹会变化，客户端必须重新导入节点。"
 }
@@ -1688,11 +1869,11 @@ diagnostic_reset_context() {
     DIAG_WARN_COUNT=0
     DIAG_FAIL_COUNT=0
     DIAG_TIMESTAMP="$(date '+%Y%m%d-%H%M%S')"
-    DIAG_FILE="${HY2_DIAG_DIR}/hy2-diagnose-${DIAG_TIMESTAMP}.log"
     DIAG_CONCLUSIONS=()
     DIAG_SUGGESTIONS=()
     DIAG_COMMANDS=()
-    : > "${DIAG_FILE}" 2>/dev/null || DIAG_FILE=""
+    # 独占创建并使用 600 权限，避免同秒覆盖和 /tmp 预置符号链接。
+    DIAG_FILE="$(mktemp "${HY2_DIAG_DIR}/hy2-diagnose-${DIAG_TIMESTAMP}.XXXXXX.log" 2>/dev/null)" || DIAG_FILE=""
 }
 
 diagnostic_log() {
@@ -1761,7 +1942,7 @@ diagnostic_check_core() {
             diagnostic_print_result "WARN" "Hysteria2 内核版本 ${core_version} 低于建议版本 v${RECOMMENDED_HY2_VERSION}。"
             diagnostic_add_item \
                 "Hysteria2 内核版本较旧。" \
-                "建议更新，以获得移动端快速重连、IPv6 mimic 与小 MTU 稳定性修复。" \
+                "建议更新到 v${RECOMMENDED_HY2_VERSION} 或更高版本，修复 HTTP 代理传输 10 秒断开与 Linux 端口跳跃误重定向出站 UDP 等问题。" \
                 "菜单 (11) -> 安装/更新 Hysteria2 内核"
         fi
     else
@@ -1881,8 +2062,7 @@ diagnostic_check_server_config() {
 diagnostic_check_public_ip() {
     local probe_ip
 
-    probe_ip="$(fetch_server_ip)"
-    if [[ -n "${probe_ip}" ]]; then
+    if probe_ip="$(fetch_public_ip)"; then
         diagnostic_print_result "OK" "公网 IP 探测成功: ${probe_ip}"
         if [[ -n "${ip:-}" && "${ip}" != "${probe_ip}" ]]; then
             diagnostic_print_result "WARN" "元数据 IP(${ip}) 与当前探测 IP(${probe_ip}) 不一致。"
@@ -1891,6 +2071,12 @@ diagnostic_check_public_ip() {
                 "客户端可能连向旧 IP，建议更新客户端配置。" \
                 "菜单 (2) 重新获取分享链接并覆盖客户端配置"
         fi
+    elif probe_ip="$(fetch_local_ip)"; then
+        diagnostic_print_result "WARN" "公网 IP 探测失败，当前仅取得本机地址: ${probe_ip}（不代表公网可达）。"
+        diagnostic_add_item \
+            "公网 IP 未经外部探测确认。" \
+            "检查出口网络；若为 NAT/内网 VPS，确认公网地址与 UDP 端口映射，不要直接使用私网分享地址。" \
+            "curl -4 https://api.ipify.org && curl -6 https://api64.ipify.org"
     else
         diagnostic_print_result "WARN" "公网 IP 探测失败，请检查网络连接。"
         diagnostic_add_item \
@@ -1937,9 +2123,12 @@ diagnostic_render_summary() {
         done
     fi
     if [[ -n "${DIAG_FILE}" ]]; then
-        cp -f "${DIAG_FILE}" "${HY2_DIAG_LATEST}" >/dev/null 2>&1 || true
         echo -e "${_blue}[信息]${_plain} 诊断报告已导出: ${DIAG_FILE}"
-        echo -e "${_blue}[信息]${_plain} 最新报告快捷路径: ${HY2_DIAG_LATEST}"
+        if write_file_atomic "${HY2_DIAG_LATEST}" < "${DIAG_FILE}" 2>/dev/null; then
+            echo -e "${_blue}[信息]${_plain} 最新报告快捷路径: ${HY2_DIAG_LATEST}"
+        else
+            echo -e "${_yellow}[提示]${_plain} 最新报告快捷路径更新失败，请使用上方报告路径。"
+        fi
     else
         echo -e "${_yellow}[提示]${_plain} 诊断报告导出失败，仅显示终端结果。"
     fi
@@ -2131,17 +2320,19 @@ restore_latest_manual_backup() {
 
     set_manual_restore_permissions "${backup_uses_tls}"
 
-    if systemctl restart "${HY2_SERVICE}" >/dev/null 2>&1; then
+    if restart_hy2_service_checked >/dev/null 2>&1; then
         ok "已恢复最近备份并重启服务: ${latest_dir}"
         return 0
     fi
 
-    err "备份文件已恢复，但服务重启失败，正在回滚到操作前配置..."
-    if restore_runtime_files && systemctl restart "${HY2_SERVICE}" >/dev/null 2>&1; then
+    err "备份文件已恢复，但服务重启失败或未保持运行，正在回滚到操作前配置..."
+    show_service_failure_hint
+    if restore_runtime_files && restart_hy2_service_checked >/dev/null 2>&1; then
         err "已恢复操作前配置，本次手动恢复未生效。"
     else
         err "自动回滚失败，请立即检查配置与服务日志。"
     fi
+    show_recent_service_logs
     return 1
 }
 

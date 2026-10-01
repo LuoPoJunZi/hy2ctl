@@ -11,16 +11,17 @@ abort_pending_config_change() {
 }
 
 restart_service_with_rollback() {
-    if systemctl restart "${HY2_SERVICE}"; then
+    if restart_hy2_service_checked; then
         return 0
     fi
-    err "重启服务失败，正在尝试自动回滚到上一版配置..."
+    err "重启服务失败或服务未保持运行，正在尝试自动回滚到上一版配置..."
     show_service_failure_hint
-    if restore_runtime_files && systemctl restart "${HY2_SERVICE}"; then
+    if restore_runtime_files && restart_hy2_service_checked; then
         err "已回滚到上一版配置，本次变更未生效。"
     else
         err "自动回滚失败，请手动检查 ${HY2_CONF_FILE} 和服务日志。"
     fi
+    show_recent_service_logs
     return 1
 }
 

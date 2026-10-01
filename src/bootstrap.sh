@@ -8,7 +8,7 @@
 # 交互式主面板不启用全局 errexit，各外部命令在对应流程中显式处理失败与回滚。
 
 # --- 1. 全局变量与颜色输出 ---
-sh_ver="v26.9.9"
+sh_ver="v26.10.1"
 
 _red="\033[0;31m"
 _green="\033[0;32m"
@@ -28,7 +28,7 @@ PANEL_TARGET_BIN="/usr/local/bin/hy2"
 PANEL_BACKUP_PREFIX="/usr/local/bin/hy2.bak"
 HY2_INSTALL_URL="https://get.hy2.sh/"
 HY2_SECURITY_BASELINE_VERSION="2.9.2"
-RECOMMENDED_HY2_VERSION="2.12.2"
+RECOMMENDED_HY2_VERSION="2.12.3"
 DEFAULT_PORT=8443
 DEFAULT_MASQUERADE_URL="https://bing.com"
 DEFAULT_SELF_SNI="bing.com"

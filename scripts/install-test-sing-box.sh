@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SING_BOX_TEST_VERSION="1.14.0"
-SING_BOX_TEST_SHA256="2375de6999f4f56ab46b4fc5ddf26a6aba1d3e61a0f4e7ddec2f4690457d5f63"
+SING_BOX_TEST_VERSION="${1:-1.14.2}"
+# 只允许审核过的版本与官方 Linux amd64 附件 SHA-256，不接受任意 URL/摘要覆盖。
+case "${SING_BOX_TEST_VERSION}" in
+    1.14.0) SING_BOX_TEST_SHA256="2375de6999f4f56ab46b4fc5ddf26a6aba1d3e61a0f4e7ddec2f4690457d5f63" ;;
+    1.14.2) SING_BOX_TEST_SHA256="a684484d7477d1437282ee411f4d131d0340aaad60a7868841ebd5d87dd8a0c6" ;;
+    *) echo "[ERROR] Unreviewed sing-box test version: ${SING_BOX_TEST_VERSION}" >&2; exit 1 ;;
+esac
 
 normalize_path() {
     local path="$1"
@@ -25,7 +30,7 @@ for dependency in curl sha256sum tar; do
     fi
 done
 
-curl --fail --location --retry 3 "${download_url}" --output "${archive}"
+curl --fail --location --retry 3 --connect-timeout 10 --max-time 180 "${download_url}" --output "${archive}"
 echo "${SING_BOX_TEST_SHA256}  ${archive}" | sha256sum --check --strict
 mkdir -p "${install_dir}"
 tar -xzf "${archive}" -C "${install_dir}" --strip-components=1

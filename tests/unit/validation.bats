@@ -33,13 +33,13 @@ source "${BATS_TEST_DIRNAME}/../helpers/bats-setup.sh"
 }
 
 @test "version comparison should handle release boundaries" {
-  run version_at_least "v2.12.2" "${RECOMMENDED_HY2_VERSION}"
+  run version_at_least "v2.12.3" "${RECOMMENDED_HY2_VERSION}"
   [ "${status}" -eq 0 ]
 
   run version_at_least "2.13.0" "${RECOMMENDED_HY2_VERSION}"
   [ "${status}" -eq 0 ]
 
-  run version_at_least "2.12.1" "${RECOMMENDED_HY2_VERSION}"
+  run version_at_least "2.12.2" "${RECOMMENDED_HY2_VERSION}"
   [ "${status}" -ne 0 ]
 
   run version_at_least "invalid" "${RECOMMENDED_HY2_VERSION}"

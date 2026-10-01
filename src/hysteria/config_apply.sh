@@ -73,11 +73,13 @@ activate_hy2_config() {
     local down_mbps="$6"
     local server_ip
 
-    server_ip="$(fetch_server_ip)"
-    if [[ -z "${server_ip}" ]]; then
+    if ! server_ip="$(fetch_server_ip)" || ! is_valid_ip "${server_ip}"; then
         abort_pending_config_change "无法获取服务器 IP"
         sleep 2
         return 1
+    fi
+    if ! is_public_ip "${server_ip}"; then
+        msg "公网 IP 探测失败，当前使用本机非公网地址 ${server_ip}；NAT/内网部署请确认客户端应连接的地址与端口映射。"
     fi
 
     if ! write_meta_info "${server_ip}" "${port}" "${password}" "${sni}" "${insecure}" "${up_mbps}" "${down_mbps}"; then
@@ -93,21 +95,6 @@ activate_hy2_config() {
         sleep 2
         return 1
     fi
-    sleep 2
-    if systemctl is-active --quiet "${HY2_SERVICE}"; then
-        ok "Hysteria2 节点配置并启动成功！"
-    else
-        err "启动失败！可能是端口被占用，或 CA 证书申请失败。请使用菜单 (4) 查看日志。"
-        show_service_failure_hint
-        err "检测到服务未保持运行，正在尝试自动回滚到上一版配置..."
-        if restore_runtime_files && systemctl restart "${HY2_SERVICE}"; then
-            err "已自动回滚到上一版配置，本次变更未生效。"
-        else
-            err "自动回滚失败，请手动检查配置与日志。"
-        fi
-        show_recent_service_logs
-        sleep 3
-        return 1
-    fi
+    ok "Hysteria2 节点配置并启动成功！"
     sleep 2
 }

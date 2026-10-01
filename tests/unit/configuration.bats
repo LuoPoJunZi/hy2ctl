@@ -3,6 +3,15 @@
 # shellcheck source=../helpers/bats-setup.sh
 source "${BATS_TEST_DIRNAME}/../helpers/bats-setup.sh"
 
+@test "atomic writer should reject directory targets without moving data inside" {
+  local target="${TEST_TMP_DIR}/target-directory"
+  mkdir "${target}"
+  run write_file_atomic "${target}" <<< 'must-not-be-written'
+  [ "${status}" -ne 0 ]
+  [ -z "$(ls -A "${target}")" ]
+  [ -z "$(find "${TEST_TMP_DIR}" -name 'target-directory.tmp.*')" ]
+}
+
 @test "config and meta writers should preserve values correctly" {
   write_self_signed_config "443" "pa'ss" "https://example.com"
   [ "$?" -eq 0 ]

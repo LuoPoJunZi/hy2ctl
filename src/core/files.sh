@@ -9,7 +9,8 @@ write_file_atomic() {
         rm -f "${tmp_file}" >/dev/null 2>&1 || true
         return 1
     fi
-    if ! mv -f "${tmp_file}" "${target}"; then
+    # -T 禁止把目录（含指向目录的链接）误当作移动目的目录。
+    if ! mv -fT -- "${tmp_file}" "${target}"; then
         rm -f "${tmp_file}" >/dev/null 2>&1 || true
         return 1
     fi

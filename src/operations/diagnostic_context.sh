@@ -6,11 +6,11 @@ diagnostic_reset_context() {
     DIAG_WARN_COUNT=0
     DIAG_FAIL_COUNT=0
     DIAG_TIMESTAMP="$(date '+%Y%m%d-%H%M%S')"
-    DIAG_FILE="${HY2_DIAG_DIR}/hy2-diagnose-${DIAG_TIMESTAMP}.log"
     DIAG_CONCLUSIONS=()
     DIAG_SUGGESTIONS=()
     DIAG_COMMANDS=()
-    : > "${DIAG_FILE}" 2>/dev/null || DIAG_FILE=""
+    # 独占创建并使用 600 权限，避免同秒覆盖和 /tmp 预置符号链接。
+    DIAG_FILE="$(mktemp "${HY2_DIAG_DIR}/hy2-diagnose-${DIAG_TIMESTAMP}.XXXXXX.log" 2>/dev/null)" || DIAG_FILE=""
 }
 
 diagnostic_log() {

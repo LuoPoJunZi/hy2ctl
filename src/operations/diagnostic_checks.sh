@@ -20,7 +20,7 @@ diagnostic_check_core() {
             diagnostic_print_result "WARN" "Hysteria2 内核版本 ${core_version} 低于建议版本 v${RECOMMENDED_HY2_VERSION}。"
             diagnostic_add_item \
                 "Hysteria2 内核版本较旧。" \
-                "建议更新，以获得移动端快速重连、IPv6 mimic 与小 MTU 稳定性修复。" \
+                "建议更新到 v${RECOMMENDED_HY2_VERSION} 或更高版本，修复 HTTP 代理传输 10 秒断开与 Linux 端口跳跃误重定向出站 UDP 等问题。" \
                 "菜单 (11) -> 安装/更新 Hysteria2 内核"
         fi
     else
@@ -140,8 +140,7 @@ diagnostic_check_server_config() {
 diagnostic_check_public_ip() {
     local probe_ip
 
-    probe_ip="$(fetch_server_ip)"
-    if [[ -n "${probe_ip}" ]]; then
+    if probe_ip="$(fetch_public_ip)"; then
         diagnostic_print_result "OK" "公网 IP 探测成功: ${probe_ip}"
         if [[ -n "${ip:-}" && "${ip}" != "${probe_ip}" ]]; then
             diagnostic_print_result "WARN" "元数据 IP(${ip}) 与当前探测 IP(${probe_ip}) 不一致。"
@@ -150,6 +149,12 @@ diagnostic_check_public_ip() {
                 "客户端可能连向旧 IP，建议更新客户端配置。" \
                 "菜单 (2) 重新获取分享链接并覆盖客户端配置"
         fi
+    elif probe_ip="$(fetch_local_ip)"; then
+        diagnostic_print_result "WARN" "公网 IP 探测失败，当前仅取得本机地址: ${probe_ip}（不代表公网可达）。"
+        diagnostic_add_item \
+            "公网 IP 未经外部探测确认。" \
+            "检查出口网络；若为 NAT/内网 VPS，确认公网地址与 UDP 端口映射，不要直接使用私网分享地址。" \
+            "curl -4 https://api.ipify.org && curl -6 https://api64.ipify.org"
     else
         diagnostic_print_result "WARN" "公网 IP 探测失败，请检查网络连接。"
         diagnostic_add_item \

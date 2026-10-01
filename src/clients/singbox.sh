@@ -24,6 +24,7 @@ show_singbox_template() {
     print_line
     echo -e "     ${_green}--- Sing-box 完整模板 (Android/iOS / 1.14+) ---${_plain}"
     print_line
+    echo -e "${_blue}[兼容]${_plain} 通过 v2rayN 使用 Sing-box 1.14 内核时，建议 v2rayN >= 7.25.4。"
     if ! render_singbox_full_template "${json_ip}" "${port}" "${up_mbps}" "${down_mbps}" "${json_password}" "${json_sni}" "${insecure}" "${cert_public_key_sha}"; then
         err "生成 Sing-box 完整模板失败，请重新配置节点。"
     fi

@@ -73,11 +73,52 @@ source "${BATS_TEST_DIRNAME}/../helpers/bats-setup.sh"
   get_hy2_core_version() { printf 'v2.12.2\n'; }
   diagnostic_reset_context
   diagnostic_check_core > "${TEST_TMP_DIR}/core-diagnostic.out"
+  [ "${DIAG_WARN_COUNT}" -eq 1 ]
+  [ "${DIAG_OK_COUNT}" -eq 0 ]
+  [[ "${DIAG_SUGGESTIONS[0]}" == *'HTTP 代理传输 10 秒断开'* ]]
+
+  get_hy2_core_version() { printf 'v2.12.3\n'; }
+  diagnostic_reset_context
+  diagnostic_check_core > "${TEST_TMP_DIR}/core-diagnostic.out"
   output="$(<"${TEST_TMP_DIR}/core-diagnostic.out")"
   [ "${DIAG_OK_COUNT}" -eq 1 ]
   [ "${DIAG_WARN_COUNT}" -eq 0 ]
-  [[ "${output}" == *"Hysteria2 内核版本: v2.12.2"* ]]
+  [[ "${output}" == *"Hysteria2 内核版本: v2.12.3"* ]]
   [ "${#DIAG_CONCLUSIONS[@]}" -eq 0 ]
+}
+
+@test "diagnostic reports created in the same second should not overwrite each other" {
+  date() { printf '20261001-120000\n'; }
+  diagnostic_reset_context
+  local first_report="${DIAG_FILE}"
+  diagnostic_log 'first report'
+  diagnostic_reset_context
+  [ "${DIAG_FILE}" != "${first_report}" ]
+  [ "$(<"${first_report}")" = 'first report' ]
+  [ -f "${DIAG_FILE}" ]
+}
+
+@test "failed latest report export should warn without announcing a shortcut" {
+  diagnostic_reset_context
+  mkdir "${HY2_DIAG_LATEST}"
+  run diagnostic_render_summary
+  [[ "${output}" == *'最新报告快捷路径更新失败'* ]]
+  [[ "${output}" != *'最新报告快捷路径:'* ]]
+  [ -z "$(ls -A "${HY2_DIAG_LATEST}")" ]
+  [ -f "${DIAG_FILE}" ]
+}
+
+@test "latest diagnostic export should replace a symlink without changing its target" {
+  local victim="${TEST_TMP_DIR}/unrelated-file"
+  printf 'keep-original' > "${victim}"
+  ln -s "${victim}" "${HY2_DIAG_LATEST}"
+  [[ -L "${HY2_DIAG_LATEST}" ]] || skip 'Native symlinks are unavailable on this platform'
+  diagnostic_reset_context
+  diagnostic_print_result 'OK' 'safe-report'
+  diagnostic_render_summary
+  [ "$(<"${victim}")" = 'keep-original' ]
+  [ ! -L "${HY2_DIAG_LATEST}" ]
+  grep -Fq 'safe-report' "${HY2_DIAG_LATEST}"
 }
 
 @test "show_service_failure_hint should classify permission denied logs" {

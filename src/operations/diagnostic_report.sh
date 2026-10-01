@@ -35,9 +35,12 @@ diagnostic_render_summary() {
         done
     fi
     if [[ -n "${DIAG_FILE}" ]]; then
-        cp -f "${DIAG_FILE}" "${HY2_DIAG_LATEST}" >/dev/null 2>&1 || true
         echo -e "${_blue}[信息]${_plain} 诊断报告已导出: ${DIAG_FILE}"
-        echo -e "${_blue}[信息]${_plain} 最新报告快捷路径: ${HY2_DIAG_LATEST}"
+        if write_file_atomic "${HY2_DIAG_LATEST}" < "${DIAG_FILE}" 2>/dev/null; then
+            echo -e "${_blue}[信息]${_plain} 最新报告快捷路径: ${HY2_DIAG_LATEST}"
+        else
+            echo -e "${_yellow}[提示]${_plain} 最新报告快捷路径更新失败，请使用上方报告路径。"
+        fi
     else
         echo -e "${_yellow}[提示]${_plain} 诊断报告导出失败，仅显示终端结果。"
     fi
