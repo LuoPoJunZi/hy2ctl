@@ -92,7 +92,7 @@ REQUIRE_SING_BOX_CHECK=1 bash scripts/verify.sh client-render
 
 完整检查要求安装 Bash、Git、ShellCheck、Bats、Python 3、OpenSSL 及常用 Unix 工具。CI 通过 `scripts/install-test-sing-box.sh` 下载并校验固定版本 Sing-box。`PYTHON_BIN`、`SING_BOX_BIN` 可指定本机工具路径；未提供 Sing-box 时普通客户端检查允许跳过原生检查，发布验证必须设置 `REQUIRE_SING_BOX_CHECK=1`。
 
-Sing-box 测试安装器默认固定 `1.14.2`，可显式传入 `1.14.0` 检查最低兼容版本；只允许脚本中已审核的版本和 SHA-256。Ubuntu CI 同时验证 `1.14.0` / `1.14.2`，Debian 和发布验证默认使用 `1.14.2`。更新时核对官方附件摘要，不自动追随 latest 或 alpha。Lint 限定只读权限、20 分钟任务上限，并取消同一 PR/分支的过期运行；发布验证仍必须在判断是否发版之前完整执行。
+Sing-box 测试安装器默认固定 `1.14.3`，可显式传入 `1.14.0` 检查最低兼容版本；只允许脚本中已审核的版本和 SHA-256。Ubuntu CI 同时验证 `1.14.0` / `1.14.3`，Debian 和发布验证默认使用 `1.14.3`。更新时核对官方附件摘要，不自动追随 latest 或 alpha。Lint 限定只读权限、20 分钟任务上限，并取消同一 PR/分支的过期运行；发布验证仍必须在判断是否发版之前完整执行。
 
 `scripts/smoke-e2e.sh` 保留为旧入口的兼容包装，实际用例为 `tests/e2e/smoke.sh`。
 

@@ -2,7 +2,7 @@
 # 职责: Hysteria2 内核、服务、配置与网络诊断检查
 
 diagnostic_check_core() {
-    local core_version
+    local core_version update_reason
 
     if ensure_hy2_core_installed; then
         core_version="$(get_hy2_core_version 2>/dev/null || true)"
@@ -18,9 +18,13 @@ diagnostic_check_core() {
             diagnostic_print_result "OK" "Hysteria2 内核版本: ${core_version}。"
         else
             diagnostic_print_result "WARN" "Hysteria2 内核版本 ${core_version} 低于建议版本 v${RECOMMENDED_HY2_VERSION}。"
+            update_reason="获得 QUIC 嗅探与域名 ACL 兼容修复，并更新 Chrome QUIC 指纹模仿"
+            if ! version_at_least "${core_version}" "2.12.3"; then
+                update_reason="修复 HTTP 代理传输 10 秒断开与 Linux 端口跳跃误重定向出站 UDP 等问题，同时${update_reason}"
+            fi
             diagnostic_add_item \
                 "Hysteria2 内核版本较旧。" \
-                "建议更新到 v${RECOMMENDED_HY2_VERSION} 或更高版本，修复 HTTP 代理传输 10 秒断开与 Linux 端口跳跃误重定向出站 UDP 等问题。" \
+                "建议更新到 v${RECOMMENDED_HY2_VERSION} 或更高版本，${update_reason}。" \
                 "菜单 (11) -> 安装/更新 Hysteria2 内核"
         fi
     else

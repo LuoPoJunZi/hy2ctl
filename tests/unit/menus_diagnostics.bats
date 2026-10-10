@@ -50,7 +50,7 @@ source "${BATS_TEST_DIRNAME}/../helpers/bats-setup.sh"
 @test "core diagnostics should distinguish security risk from recommended updates" {
   hysteria() { :; }
 
-  get_hy2_core_version() { printf 'v2.8.1\n'; }
+  get_hy2_core_version() { printf 'v2.9.1\n'; }
   diagnostic_reset_context
   diagnostic_check_core > "${TEST_TMP_DIR}/core-diagnostic.out"
   output="$(<"${TEST_TMP_DIR}/core-diagnostic.out")"
@@ -81,9 +81,29 @@ source "${BATS_TEST_DIRNAME}/../helpers/bats-setup.sh"
   diagnostic_reset_context
   diagnostic_check_core > "${TEST_TMP_DIR}/core-diagnostic.out"
   output="$(<"${TEST_TMP_DIR}/core-diagnostic.out")"
+  [ "${DIAG_WARN_COUNT}" -eq 1 ]
+  [ "${DIAG_OK_COUNT}" -eq 0 ]
+  [[ "${output}" != *"高危安全风险"* ]]
+  [[ "${DIAG_SUGGESTIONS[0]}" == *'QUIC 嗅探与域名 ACL 兼容修复'* ]]
+  [[ "${DIAG_SUGGESTIONS[0]}" != *'HTTP 代理传输 10 秒断开'* ]]
+
+  get_hy2_core_version() { printf 'v2.13.0\n'; }
+  diagnostic_reset_context
+  diagnostic_check_core > "${TEST_TMP_DIR}/core-diagnostic.out"
+  output="$(<"${TEST_TMP_DIR}/core-diagnostic.out")"
   [ "${DIAG_OK_COUNT}" -eq 1 ]
   [ "${DIAG_WARN_COUNT}" -eq 0 ]
-  [[ "${output}" == *"Hysteria2 内核版本: v2.12.3"* ]]
+  [[ "${output}" == *"Hysteria2 内核版本: v2.13.0"* ]]
+  [ "${#DIAG_CONCLUSIONS[@]}" -eq 0 ]
+}
+
+@test "core diagnostics should accept versions newer than the recommendation" {
+  hysteria() { :; }
+  get_hy2_core_version() { printf 'v2.13.1\n'; }
+  diagnostic_reset_context
+  diagnostic_check_core > "${TEST_TMP_DIR}/core-diagnostic.out"
+  [ "${DIAG_OK_COUNT}" -eq 1 ]
+  [ "${DIAG_WARN_COUNT}" -eq 0 ]
   [ "${#DIAG_CONCLUSIONS[@]}" -eq 0 ]
 }
 

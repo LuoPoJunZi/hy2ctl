@@ -124,9 +124,9 @@ hy2
 
 ```text
 =====================================================
-  hy2ctl 管理面板 v26.10.1 |  快捷启动: hy2
+  hy2ctl 管理面板 v26.10.10 |  快捷启动: hy2
 =====================================================
-  内核版本: v2.12.2    服务状态: 运行中
+  内核版本: v2.13.0    服务状态: 运行中
 -----------------------------------------------------
   节点核心管理
     (1)  节点配置（CA / 自签）
@@ -211,6 +211,7 @@ hy2
 - 菜单 `7` 复制完整模板（适合新建配置，使用新版 `rule_set` 规则格式）
 - 自签模式要求 Sing-box `1.13.0+`，脚本会自动加入 `certificate_public_key_sha256` 公钥固定
 - 完整模板要求 Sing-box `1.14.0+`，远程规则集通过顶层 `http_clients` 和 `route.default_http_client` 使用 `proxy` 出站下载，不再使用已弃用的 `download_detour`
+- 稳定版验证目标为 Sing-box `1.14.3`，同时保留 `1.14.0` 最低兼容验证。`1.15` alpha 仍处于测试阶段，不作为默认依赖，不在现有模板中替换 `certificate_public_key_sha256`；参见[官方更新说明](https://github.com/SagerNet/sing-box/releases/tag/v1.14.3)和[测试版日志](https://sing-box.sagernet.org/changelog/)。
 
 ### 7.3 自签模式注意
 
@@ -232,7 +233,9 @@ hy2
 3. 菜单 `4` 查看实时日志
 
 菜单 `8` 会在结果末尾给出结构化排障建议：`结论 + 建议 + 命令`，可直接按命令执行。
-诊断还会分级检查 Hysteria2 内核版本：低于 `v2.9.2` 时会标记为高危安全风险并提示立即通过菜单 `11` 更新；`v2.9.2` 至 `v2.12.2` 会提示更新到 `v2.12.3+`，修复 HTTP 代理传输 10 秒断开、Linux 端口跳跃误重定向出站 UDP 等问题。安全基线依据 Hysteria 官方[安全公告](https://github.com/HyNetworks/hysteria/security/advisories)，兼容性建议依据 [v2.12.3 更新说明](https://github.com/HyNetworks/hysteria/releases/tag/app/v2.12.3)。
+诊断还会分级检查 Hysteria2 内核版本：低于 `v2.9.2` 时标记为高危安全风险并提示立即通过菜单 `11` 更新；达到安全基线但低于 `v2.13.0` 时提示兼容性与稳定性更新。低于 `v2.12.3` 的旧内核还会提示 HTTP 代理传输 10 秒断开、Linux 端口跳跃误重定向出站 UDP 修复；`v2.12.3` 则提示 `v2.13.0` 的分包 QUIC 嗅探与域名 ACL 兼容修复、Chrome QUIC 指纹模仿更新，不误报已修复的问题。安全基线依据 Hysteria 官方[安全公告](https://github.com/HyNetworks/hysteria/security/advisories)，兼容性建议依据 [v2.12.3 更新说明](https://github.com/HyNetworks/hysteria/releases/tag/app/v2.12.3)和 [v2.13.0 更新说明](https://github.com/HyNetworks/hysteria/releases/tag/app/v2.13.0)。
+
+推荐版本只是诊断建议，不是安装版本锁定，也不代表该范围内所有版本都存在同一种漏洞。面板仍调用官方安装器安装或更新内核；默认服务端配置不启用 sniff/ACL，不会因为提升推荐版本而改写现有配置。
 
 Hysteria2 2.12.2 增加了 `quic.disableStatelessReset` 作为兼容性开关。面板不会默认写入该选项，保持 Stateless Reset 启用，以保留移动端休眠后的快速重连能力；只有确认特定网络环境与 Stateless Reset 冲突时，才建议手动设为 `true` 进行排障。
 
@@ -256,6 +259,14 @@ namei -l /etc/hysteria/config.yaml
 ### 8.4 公网 IP 探测失败
 
 脚本先通过外部服务探测 IPv4，再探测 IPv6，只接受格式合法的公网候选地址；错误页面、保留地址及请求失败时的部分响应不会写入节点元数据。外部探测失败时仍可回退到格式合法的本机地址，以兼容 NAT/内网部署，但菜单 `8` 会明确警告“本机地址不代表公网可达”。如果使用了私网分享地址，应先确认公网 IP、云安全组和 UDP 端口映射，不能把面板配置成功等同于外网可连接。
+
+### 8.5 Windows Sing-box TUN 高 CPU / Winsock 10055
+
+2026-10-03 的[上游用户报告 #4602](https://github.com/SagerNet/sing-box/issues/4602)描述了 Windows/SFW `1.14.2` 在 TUN 模式下出现大量 IPv6 UDP 连接和 Winsock `10055` 的现象；报告者关闭 Teredo 后现象停止。截至 2026-10-10，根因和影响范围尚未确认，不能据此断言面板模板有问题，也不能宣称 `1.14.3` 已修复该报告。
+
+- 先记录客户端/内核版本、是否使用 TUN、最近日志及资源占用；同一节点临时改用非 TUN 系统代理，对比问题是否只在 TUN 下出现。
+- 可只读检查 Teredo 状态：`netsh interface teredo show state`。仅当症状与报告一致时，在维护窗口由用户决定是否做可恢复的 Teredo 对照测试；先记录原配置，测试后恢复，不直接关闭系统 IPv6。
+- 面板运行在 Linux VPS，不会修改 Windows 网络配置；VPS 服务运行正常也不能排除客户端路由问题。分享日志或配置前请隐藏认证密码、节点地址及证书固定值。
 
 ---
 

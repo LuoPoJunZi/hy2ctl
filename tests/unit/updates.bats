@@ -19,20 +19,26 @@ source "${BATS_TEST_DIRNAME}/../helpers/bats-setup.sh"
 
   run bash "${TEST_ROOT_DIR}/scripts/install-test-sing-box.sh"
   [ "${status}" -eq 0 ]
-  grep -Fq 'a684484d7477d1437282ee411f4d131d0340aaad60a7868841ebd5d87dd8a0c6' "${SING_BOX_TEST_COMMAND_LOG}"
-  grep -Fq 'sing-box-1.14.2-linux-amd64.tar.gz' "${SING_BOX_TEST_COMMAND_LOG}"
+  grep -Fq 'e2bdf179c15a3652955dc44867e33ca0965c9c9b91b34267dcc5a5d639a5feee' "${SING_BOX_TEST_COMMAND_LOG}"
+  grep -Fq 'sing-box-1.14.3-linux-amd64.tar.gz' "${SING_BOX_TEST_COMMAND_LOG}"
   grep -Fq -- '--connect-timeout 10 --max-time 180' "${SING_BOX_TEST_COMMAND_LOG}"
   grep -Fq 'sing-box-1.14.0' "${GITHUB_PATH}"
-  grep -Fq 'sing-box-1.14.2' "${GITHUB_PATH}"
+  grep -Fq 'sing-box-1.14.3' "${GITHUB_PATH}"
+
+  run bash "${TEST_ROOT_DIR}/scripts/install-test-sing-box.sh" '1.14.3'
+  [ "${status}" -eq 0 ]
 }
 
 @test "sing-box test installer should reject unreviewed versions without downloading" {
   curl() { echo 'unexpected-download'; }
   export -f curl
-  run bash "${TEST_ROOT_DIR}/scripts/install-test-sing-box.sh" '1.15.0-alpha.9'
-  [ "${status}" -ne 0 ]
-  [[ "${output}" == *'Unreviewed sing-box test version'* ]]
-  [[ "${output}" != *'unexpected-download'* ]]
+  local version
+  for version in '1.14.2' '1.15.0-alpha.11'; do
+    run bash "${TEST_ROOT_DIR}/scripts/install-test-sing-box.sh" "${version}"
+    [ "${status}" -ne 0 ]
+    [[ "${output}" == *'Unreviewed sing-box test version'* ]]
+    [[ "${output}" != *'unexpected-download'* ]]
+  done
 }
 
 @test "sing-box test installer should stop before extraction if checksum validation fails" {
@@ -45,7 +51,7 @@ source "${BATS_TEST_DIRNAME}/../helpers/bats-setup.sh"
   run bash "${TEST_ROOT_DIR}/scripts/install-test-sing-box.sh"
   [ "${status}" -ne 0 ]
   [[ "${output}" != *'unexpected-extraction'* ]]
-  [ ! -e "${TEST_TMP_DIR}/sing-box-1.14.2" ]
+  [ ! -e "${TEST_TMP_DIR}/sing-box-1.14.3" ]
   [ ! -e "${GITHUB_PATH}" ]
 }
 
