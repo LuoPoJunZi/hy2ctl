@@ -74,6 +74,8 @@ bash scripts/benchmark.sh <(git show HEAD:hy2.sh) 30
 
 每个需要文件操作的测试用例通过 `test_create_environment` 创建独立临时目录，并由 trap 或 Bats teardown 清理。模拟命令只影响加载它的测试进程，不替换系统命令。
 
+`tests/unit/installer.bats` 单独加载 `install.sh` 的函数；source 不部署面板、不修改调用者的 Shell 选项。所有 APT/DNF/YUM 均为函数模拟，不执行真实软件包安装。覆盖依赖齐全时跳过坏软件源、可选 wget、仅补缺失项、原始索引/锁错误、锁等待参数和安装后依赖复检；真实云主机验收仍按独立清单执行。
+
 快照/恢复测试必须覆盖末项复制失败、当前指针发布失败、旧格式兼容、损坏指针拒绝、当前/手动快照清理保护以及服务重启后退出；IP 测试覆盖两种地址族、IPv6 压缩/嵌入格式、错误页面、部分响应、本机回退与公网诊断分级。Bats 新增用例不能只修改断言使错误输出“通过”；应先复现失败再验证修复。
 
 `verify.sh syntax/shellcheck` 递归发现 src、scripts、tests 中的 Shell 文件；Bats 递归发现 unit 中的用例。静态样例不要用 `.sh` 伪装不可执行文本。

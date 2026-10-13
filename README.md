@@ -102,7 +102,7 @@ ssh root@你的服务器IP
 bash <(curl -fsSL https://raw.githubusercontent.com/LuoPoJunZi/hy2ctl/main/install.sh)
 ```
 
-安装器会依次安装基础依赖、部署管理面板并自动安装或更新 Hysteria2 内核，全部成功后直接进入主菜单。
+安装器会检查 `curl` / `openssl`，仅安装缺失的基础依赖；`wget` 只是可选下载回退，不强制安装。依赖齐全时不会刷新软件包索引，因此不会被无关的坏软件源拦住；缺少依赖时保留包管理器原始错误，不绕过签名验证。随后部署管理面板并自动安装或更新 Hysteria2 内核，全部成功后直接进入主菜单。
 
 ### 4.3 打开面板
 
@@ -267,6 +267,20 @@ namei -l /etc/hysteria/config.yaml
 - 先记录客户端/内核版本、是否使用 TUN、最近日志及资源占用；同一节点临时改用非 TUN 系统代理，对比问题是否只在 TUN 下出现。
 - 可只读检查 Teredo 状态：`netsh interface teredo show state`。仅当症状与报告一致时，在维护窗口由用户决定是否做可恢复的 Teredo 对照测试；先记录原配置，测试后恢复，不直接关闭系统 IPv6。
 - 面板运行在 Linux VPS，不会修改 Windows 网络配置；VPS 服务运行正常也不能排除客户端路由问题。分享日志或配置前请隐藏认证密码、节点地址及证书固定值。
+
+### 8.6 一键安装提示“基础依赖准备失败”（含甲骨文云 Ubuntu）
+
+这一步发生在生成节点配置之前，不是 Hysteria2 YAML 配置错误。先确认必要命令和软件源：
+
+```bash
+command -v curl openssl
+sudo apt-get update
+grep -RnsE '^[[:space:]]*(deb(-src)?[[:space:]]|URIs:|Suites:)' /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null
+```
+
+甲骨文云 Ubuntu 26.04 ARM64 的一次实际故障是安全源写成 `URIs: https:///ubuntu-ports/`，缺少主机名，APT 报 `https:/ubuntu-ports ... does not have a Release file`。该问题来自软件源配置，不是甲骨文云专属限制。应先备份实际源文件，仅修正错误 URI；Ubuntu Ports 的正确基础地址是 `https://ports.ubuntu.com/ubuntu-ports/`，保留对应系统的 suite、组件和 `Signed-By`。不要套用 ARM64 地址到 amd64，也不要删除 Docker 等其他源或关闭 APT 签名验证。参见[官方仓库的 resolute-security 元数据](https://ports.ubuntu.com/ubuntu-ports/dists/resolute-security/Release)。
+
+安装器仅在必要命令缺失时使用 APT；安装阶段为 dpkg 锁设置 60 秒等待，并限制下载重试和 HTTP/HTTPS 超时。索引锁不一定受 dpkg 等待选项影响，失败时以原始错误为准；不要删除锁文件或终止系统更新进程。依赖齐全时跳过 APT 不代表软件源已修好，仍需单独修复软件源以恢复系统安全更新。
 
 ---
 

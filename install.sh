@@ -4,7 +4,10 @@
 # 描述: 下载并部署管理面板到系统级命令
 # ==========================================
 
-set -euo pipefail
+# source 仅加载函数供无特权测试使用，不修改调用者的 Shell 选项。
+if [[ "${BASH_SOURCE[0]:-$0}" == "$0" ]]; then
+    set -euo pipefail
+fi
 
 _red="\033[0;31m"
 _green="\033[0;32m"
@@ -66,20 +69,52 @@ detect_pkg_manager() {
 }
 
 install_dependencies() {
-    local pm="$1"
-    msg "正在检查基础依赖 (curl, wget, openssl)..."
+    local pm="$1" cmd
+    local -a missing_commands=()
+    local -a apt_options=(
+        -o DPkg::Lock::Timeout=60
+        -o Acquire::Retries=2
+        -o Acquire::http::Timeout=20
+        -o Acquire::https::Timeout=20
+    )
+    msg "正在检查基础依赖 (curl, openssl；wget 为可选下载回退)..."
+    for cmd in curl openssl; do
+        if ! command -v "${cmd}" >/dev/null 2>&1; then
+            missing_commands+=("${cmd}")
+        fi
+    done
+    if [[ "${#missing_commands[@]}" -eq 0 ]]; then
+        msg "基础依赖已齐全，跳过软件包索引刷新与安装。"
+        return 0
+    fi
+
+    msg "仅安装缺失依赖: ${missing_commands[*]}"
     case "${pm}" in
         apt-get)
-            apt-get update -y >/dev/null 2>&1 || return 1
-            apt-get install -y curl wget openssl >/dev/null 2>&1 || return 1
+            # 保留原始错误；不绕过签名验证，不删除包管理器锁或改写软件源。
+            if ! apt-get "${apt_options[@]}" update; then
+                err "APT 软件包索引刷新失败，请根据上方错误检查软件源、网络或索引锁占用。"
+                return 1
+            fi
+            if ! DEBIAN_FRONTEND=noninteractive apt-get "${apt_options[@]}" install -y "${missing_commands[@]}"; then
+                err "APT 依赖安装失败，请根据上方错误检查 dpkg 锁占用或软件包状态。"
+                return 1
+            fi
             ;;
         dnf|yum)
-            "${pm}" install -y curl wget openssl >/dev/null 2>&1 || return 1
+            if ! "${pm}" install -y "${missing_commands[@]}"; then
+                err "${pm} 依赖安装失败，请根据上方错误检查软件源或软件包状态。"
+                return 1
+            fi
             ;;
         *)
+            err "不支持的包管理器: ${pm}"
             return 1
             ;;
     esac
+    for cmd in curl openssl; do
+        require_cmd "${cmd}" || return 1
+    done
     return 0
 }
 
@@ -134,6 +169,10 @@ download_panel() {
     return 0
 }
 
+if [[ "${BASH_SOURCE[0]:-$0}" != "$0" ]]; then
+    return 0
+fi
+
 echo -e "${_green}=====================================================${_plain}"
 echo -e "              欢迎使用 hy2ctl 一键部署脚本"
 echo -e "${_green}=====================================================${_plain}"
@@ -149,7 +188,7 @@ if [[ -z "${PKG_MANAGER}" ]]; then
     exit 1
 fi
 if ! install_dependencies "${PKG_MANAGER}"; then
-    err "基础依赖安装失败，请检查网络或软件源配置后重试。"
+    err "基础依赖准备失败，请根据上方包管理器错误处理后重试。"
     exit 1
 fi
 
