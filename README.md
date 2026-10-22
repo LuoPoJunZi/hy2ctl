@@ -1,17 +1,27 @@
-# ⚡ hy2ctl 管理面板
-
 <div align="center">
 
-一个面向 VPS 的 Hysteria2 一键运维脚本。<br>
-目标：**让新手 5 分钟部署成功**，也让开发者可以**低成本二次开发**。
+<h1>hy2ctl</h1>
 
-[![Bash](https://img.shields.io/badge/Language-Bash-4EAA25?style=flat-square&logo=gnu-bash)](https://www.gnu.org/software/bash/)
-[![Hysteria2](https://img.shields.io/badge/Core-Hysteria%20v2-blueviolet?style=flat-square)](https://v2.hysteria.network/)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
+<p><strong>Hysteria2 一键部署与管理面板</strong></p>
+
+<p>纯 Bash · 面向 Linux VPS · 配置、分享、诊断与备份</p>
+
+<p>
+  <a href="https://www.gnu.org/software/bash/"><img src="https://img.shields.io/badge/Language-Bash-4EAA25?style=flat-square&amp;logo=gnu-bash" alt="Bash"></a>
+  <a href="https://v2.hysteria.network/"><img src="https://img.shields.io/badge/Core-Hysteria%20v2-blueviolet?style=flat-square" alt="Hysteria2"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square" alt="MIT License"></a>
+</p>
+
+<p>
+  <a href="#quick-start">快速开始</a> ·
+  <a href="#menu">菜单说明</a> ·
+  <a href="#troubleshooting">常见问题</a> ·
+  <a href="docs/development.md">开发文档</a> ·
+  <a href="CHANGELOG.md">更新记录</a> ·
+  <a href="https://github.com/LuoPoJunZi/hy2ctl">GitHub 仓库</a>
+</p>
 
 </div>
-
-[GitHub 仓库](https://github.com/LuoPoJunZi/hy2ctl) · [开发文档](docs/development.md)
 
 ---
 
@@ -88,6 +98,8 @@
 
 ---
 
+<a id="quick-start"></a>
+
 ## 4. 快速开始（新手照着做）
 
 ### 4.1 登录 VPS（root）
@@ -119,6 +131,8 @@ hy2
 3. 菜单 `8`：执行一键诊断
 
 ---
+
+<a id="menu"></a>
 
 ## 5. 菜单说明（逐项解释）
 
@@ -230,6 +244,8 @@ hy2
 
 ---
 
+<a id="troubleshooting"></a>
+
 ## 8. 常见问题与排障
 
 ### 8.1 服务起不来
@@ -338,14 +354,6 @@ bash scripts/verify.sh all
 
 ---
 
-## 12. 致谢与来源
-
-本项目实践内容参考了作者博客教程：
-
-- https://blog.luopojunzi.com/p/hysteria/
-
----
-
-## 13. 开源协议
+## 12. 开源协议
 
 本项目基于 [MIT License](LICENSE) 协议开源。
