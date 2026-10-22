@@ -55,6 +55,31 @@ get_hy2_core_version() {
     printf '%s\n' "${BASH_REMATCH[0]}"
 }
 
+get_hy2_go_version() {
+    local version_output line
+    command -v hysteria >/dev/null 2>&1 || return 1
+    version_output="$(hysteria version 2>/dev/null)" || return 1
+    while IFS= read -r line; do
+        # 只信版本命令的明确字段；不从库版本、开发版或厂商后缀猜测修复状态。
+        if [[ "${line}" =~ ^Toolchain:[[:space:]]*(go1\.[0-9]+\.[0-9]+)[[:space:]]*$ ]]; then
+            printf '%s\n' "${BASH_REMATCH[1]}"
+            return 0
+        fi
+    done <<< "${version_output}"
+    return 1
+}
+
+go_version_has_ca_mitigation() {
+    local version="${1#go}"
+    # CVE-2026-111943: https://go.dev/issue/82345
+    # 必须分别比较维护分支，不能把 go1.27.0 当成高于 go1.26.10 的修复版。
+    case "${version}" in
+        1.26.*) version_at_least "${version}" "1.26.10" ;;
+        1.27.*) version_at_least "${version}" "1.27.3" ;;
+        *) version_at_least "${version}" "1.28.0" ;;
+    esac
+}
+
 version_at_least() {
     local current="${1#v}"
     local minimum="${2#v}"

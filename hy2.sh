@@ -8,7 +8,7 @@
 # 交互式主面板不启用全局 errexit，各外部命令在对应流程中显式处理失败与回滚。
 
 # --- 1. 全局变量与颜色输出 ---
-sh_ver="v26.10.10"
+sh_ver="v26.10.22"
 
 _red="\033[0;31m"
 _green="\033[0;32m"
@@ -118,6 +118,31 @@ get_hy2_core_version() {
     version_output="$(hysteria version 2>/dev/null)" || return 1
     [[ "${version_output}" =~ v[0-9]+\.[0-9]+\.[0-9]+ ]] || return 1
     printf '%s\n' "${BASH_REMATCH[0]}"
+}
+
+get_hy2_go_version() {
+    local version_output line
+    command -v hysteria >/dev/null 2>&1 || return 1
+    version_output="$(hysteria version 2>/dev/null)" || return 1
+    while IFS= read -r line; do
+        # 只信版本命令的明确字段；不从库版本、开发版或厂商后缀猜测修复状态。
+        if [[ "${line}" =~ ^Toolchain:[[:space:]]*(go1\.[0-9]+\.[0-9]+)[[:space:]]*$ ]]; then
+            printf '%s\n' "${BASH_REMATCH[1]}"
+            return 0
+        fi
+    done <<< "${version_output}"
+    return 1
+}
+
+go_version_has_ca_mitigation() {
+    local version="${1#go}"
+    # CVE-2026-111943: https://go.dev/issue/82345
+    # 必须分别比较维护分支，不能把 go1.27.0 当成高于 go1.26.10 的修复版。
+    case "${version}" in
+        1.26.*) version_at_least "${version}" "1.26.10" ;;
+        1.27.*) version_at_least "${version}" "1.27.3" ;;
+        *) version_at_least "${version}" "1.28.0" ;;
+    esac
 }
 
 version_at_least() {
@@ -1571,15 +1596,25 @@ http:
 EOF
 }
 
+print_client_security_notice() {
+    print_line
+    echo -e "${_yellow}[客户端安全提醒：CA / 自签均适用]${_plain}"
+    echo -e "  v2rayN >= 7.24.9 修复旧版下载器中间人攻击风险；建议使用 7.25.6 或更新稳定版。"
+    echo -e "  仅更新 v2rayN 不代表内核已修复，请在客户端核对实际 Xray-core 版本。"
+    echo -e "  Xray-core 26.10.10 / 26.10.17 已因证书信任问题撤版。"
+    echo -e "  请使用 26.10.21（上游预发布安全修复）或后续明确包含修复的版本。"
+    echo -e "  公告：https://github.com/XTLS/Xray-core/releases/tag/v26.10.21"
+    echo -e "  通过 v2rayN 管理 Sing-box 1.14 内核时，请使用 v2rayN >= 7.25.4。"
+    echo -e "  客户端内核需在客户端更新；菜单 (11) 更新的是 VPS 面板与 Hysteria2 内核。"
+}
+
 print_v2rayn_insecure_notice() {
     print_line
     echo -e "${_yellow}[v2rayN / Xray 自签证书提醒]${_plain}"
     echo -e "  原生 Hysteria2 使用 insecure=1 与 pinSHA256 验证自签证书。"
     echo -e "  v2rayN / Xray 使用 pcs 映射 pinnedPeerCertSha256。"
-    echo -e "  使用 Xray 时请确保：v2rayN >= 7.17.1，Xray-core >= 26.2.6。"
-    echo -e "  请使用 v2rayN >= 7.24.9，以修复旧版下载器的中间人攻击风险。"
+    echo -e "  自签功能兼容最低要求：v2rayN >= 7.17.1，Xray-core >= 26.2.6（不是当前安全建议）。"
     echo -e "  Sing-box 自签配置使用公钥固定，请使用 Sing-box >= 1.13.0。"
-    echo -e "  通过 v2rayN 管理 Sing-box 1.14 内核时，请使用 v2rayN >= 7.25.4。"
     echo -e "  分享链接已移除 allowInsecure，不再依赖已废弃的跳过验证字段。"
     echo -e "  重新生成自签证书后指纹会变化，客户端必须重新导入节点。"
 }
@@ -1680,6 +1715,8 @@ show_info() {
     if ! ensure_client_export_material "${cert_sha}" "${cert_public_key_sha}"; then
         return 1
     fi
+
+    print_client_security_notice
 
     if [[ "${insecure}" == "true" ]]; then
         print_v2rayn_insecure_notice
@@ -2091,6 +2128,97 @@ diagnostic_check_public_ip() {
 }
 
 # shellcheck shell=bash
+# 职责: 本机 Go 构建与系统 CA 包的只读核验；不更新软件包、不访问网络。
+
+diagnostic_check_go_trust() {
+    local go_version
+    command -v hysteria >/dev/null 2>&1 || return 0
+    if ! go_version="$(get_hy2_go_version)"; then
+        diagnostic_print_result "WARN" "Hysteria2 Go 构建版本未知，无法确认 CVE-2026-111943 工具链修复状态。"
+    elif go_version_has_ca_mitigation "${go_version}"; then
+        diagnostic_print_result "OK" "Hysteria2 Go 构建版本: ${go_version}，达到 CVE-2026-111943 工具链基线（不代表系统 CA 已更新）。"
+        return 0
+    else
+        diagnostic_print_result "WARN" "Hysteria2 Go 构建版本: ${go_version}，未达到 CVE-2026-111943 工具链基线；厂商回移修复需另行确认。"
+    fi
+    diagnostic_add_item \
+        "Hysteria2 的 Go 证书验证修复需要核对。" \
+        "向内核上游核对 Go 1.26.10 / 1.27.3 或后续修复构建；仅升级系统 Go 不会修复现有二进制。系统 CA 更新也需单独检查，不关闭 TLS 校验。" \
+        "hysteria version；公告 https://go.dev/issue/82345；菜单 (11) 检查官方内核更新"
+}
+
+diagnostic_os_release_field() {
+    local wanted="$1" key value
+    local release_file="${HY2_OS_RELEASE_FILE:-/etc/os-release}"
+    [[ -f "${release_file}" && -r "${release_file}" ]] || return 1
+    # 不 source / eval 系统描述文件，且只返回诊断需要的简单值。
+    while IFS='=' read -r key value || [[ -n "${key}" ]]; do
+        [[ "${key}" == "${wanted}" ]] || continue
+        case "${value}" in
+            \"*\") value="${value:1:${#value}-2}" ;;
+            \'*\') value="${value:1:${#value}-2}" ;;
+        esac
+        [[ "${value}" =~ ^[a-zA-Z0-9._-]+$ ]] || return 1
+        printf '%s\n' "${value}"
+        return 0
+    done < "${release_file}"
+    return 1
+}
+
+get_ca_certificates_version() {
+    local package_output package_version
+    if command -v dpkg-query >/dev/null 2>&1; then
+        package_output="$(dpkg-query -W -f='${db:Status-Status} ${Version}' ca-certificates 2>/dev/null)" || return 1
+        [[ "${package_output}" =~ ^installed[[:blank:]]+([0-9][a-zA-Z0-9.+:~_-]*)$ ]] || return 1
+        package_version="${BASH_REMATCH[1]}"
+    elif command -v rpm >/dev/null 2>&1; then
+        package_version="$(rpm -q --qf '%{VERSION}-%{RELEASE}' ca-certificates 2>/dev/null)" || return 1
+    else
+        return 1
+    fi
+    [[ "${package_version}" =~ ^[0-9][a-zA-Z0-9.+:~_-]*$ ]] || return 1
+    printf '%s\n' "${package_version}"
+}
+
+diagnostic_check_ca_trust() {
+    local os_id os_version ca_version baseline="" compare_status
+    local update_hint="按发行版官方安全公告手动更新 ca-certificates；不要绕过 TLS 验证。"
+    local command_hint="cat /etc/os-release；核对发行版 ca-certificates 安全公告"
+    os_id="$(diagnostic_os_release_field ID)" || os_id="unknown"
+    os_version="$(diagnostic_os_release_field VERSION_ID)" || os_version="unknown"
+    if [[ "${os_id}" == "ubuntu" ]]; then
+        # USN-8944-1（2026-10-20），不同发行版不可复用此包版本基线。
+        case "${os_version}" in
+            22.04|24.04|26.04|26.10) baseline="20260816ubuntu0.${os_version}.1" ;;
+        esac
+        command_hint="apt-get update && apt-get install --only-upgrade ca-certificates"
+    fi
+
+    if ! ca_version="$(get_ca_certificates_version)"; then
+        if [[ "${os_id}" == "ubuntu" ]]; then
+            command_hint="apt-get update && apt-get install ca-certificates"
+        fi
+        diagnostic_print_result "WARN" "系统 ca-certificates 未安装或版本不可读，证书信任库状态未知（${os_id} ${os_version}）。"
+    elif [[ -z "${baseline}" ]] || ! command -v dpkg >/dev/null 2>&1; then
+        diagnostic_print_result "WARN" "系统 ca-certificates: ${ca_version}（${os_id} ${os_version}）；无可用的发行版核验基线或比较工具，修复状态未知。"
+    elif dpkg --compare-versions "${ca_version}" ge "${baseline}"; then
+        diagnostic_print_result "OK" "Ubuntu ${os_version} ca-certificates: ${ca_version}，达到 USN-8944-1 软件包基线（自定义/内置 CA 库未核验）。"
+        return 0
+    else
+        compare_status=$?
+        if [[ "${compare_status}" -eq 1 ]]; then
+            diagnostic_print_result "WARN" "Ubuntu ${os_version} ca-certificates: ${ca_version}，低于 USN-8944-1 修复版本 ${baseline}。"
+        else
+            diagnostic_print_result "WARN" "系统 ca-certificates: ${ca_version}；软件包版本比较失败，修复状态未知。"
+        fi
+    fi
+    diagnostic_add_item \
+        "系统 CA 信任库需要人工核对。" \
+        "${update_hint} Ubuntu 参考 https://ubuntu.com/security/notices/USN-8944-1；包版本检查不涵盖自定义/内置 CA 库。更新后按发行版说明重启使用旧信任库的进程。" \
+        "${command_hint}"
+}
+
+# shellcheck shell=bash
 # 职责: 诊断结果摘要、建议与报告导出
 
 diagnostic_render_summary() {
@@ -2157,6 +2285,10 @@ show_diagnostics() {
     fi
 
     diagnostic_check_core
+
+    diagnostic_check_go_trust
+
+    diagnostic_check_ca_trust
 
     diagnostic_check_service
 

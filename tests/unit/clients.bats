@@ -68,12 +68,43 @@ source "${BATS_TEST_DIRNAME}/../helpers/bats-setup.sh"
   [[ "${output}" == *"pinSHA256"* ]]
   [[ "${output}" == *"pcs"* ]]
   [[ "${output}" == *"Xray-core >= 26.2.6"* ]]
-  [[ "${output}" == *"v2rayN >= 7.24.9"* ]]
-  [[ "${output}" == *"v2rayN >= 7.25.4"* ]]
   [[ "${output}" == *"Sing-box >= 1.13.0"* ]]
   [[ "${output}" == *"pinnedPeerCertSha256"* ]]
   [[ "${output}" == *"已移除 allowInsecure"* ]]
   [[ "${output}" == *"重新导入节点"* ]]
+}
+
+@test "client security notice should separate Xray compatibility from the emergency update" {
+  run print_client_security_notice
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *'CA / 自签均适用'* ]]
+  [[ "${output}" == *'v2rayN >= 7.24.9'* ]]
+  [[ "${output}" == *'7.25.6'* ]]
+  [[ "${output}" == *'26.10.10'* && "${output}" == *'26.10.17'* ]]
+  [[ "${output}" == *'26.10.21'* && "${output}" == *'预发布安全修复'* ]]
+  [[ "${output}" == *'不代表内核已修复'* ]]
+}
+
+@test "client display should show general safety advice in CA and self-signed modes" {
+  require_meta_info() { :; }
+  print_client_summary() { :; }
+  ensure_client_export_material() { :; }
+  print_client_exports() { :; }
+  print_line() { :; }
+  wait_return() { :; }
+  get_certificate_sha256() { :; }
+  get_certificate_public_key_sha256() { :; }
+  print_v2rayn_insecure_notice() { echo self-signed-only; }
+  insecure=false
+  run show_info
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *'CA / 自签均适用'* ]]
+  [[ "${output}" == *'26.10.21'* ]]
+  [[ "${output}" != *self-signed-only* ]]
+  insecure=true
+  run show_info
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *'CA / 自签均适用'* && "${output}" == *self-signed-only* ]]
 }
 
 @test "hysteria2 share URL should use URI boolean values" {

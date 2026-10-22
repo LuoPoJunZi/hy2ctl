@@ -17,6 +17,10 @@ show_diagnostics() {
 
     diagnostic_check_core
 
+    diagnostic_check_go_trust
+
+    diagnostic_check_ca_trust
+
     diagnostic_check_service
 
     diagnostic_check_runtime_files

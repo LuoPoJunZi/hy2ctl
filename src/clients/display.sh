@@ -18,6 +18,8 @@ show_info() {
         return 1
     fi
 
+    print_client_security_notice
+
     if [[ "${insecure}" == "true" ]]; then
         print_v2rayn_insecure_notice
     fi

@@ -33,6 +33,7 @@ src/clients/cheatsheet.sh
 src/panel/update.sh
 src/operations/diagnostic_context.sh
 src/operations/diagnostic_checks.sh
+src/operations/diagnostic_trust.sh
 src/operations/diagnostic_report.sh
 src/operations/diagnostics.sh
 src/operations/backup_create.sh
