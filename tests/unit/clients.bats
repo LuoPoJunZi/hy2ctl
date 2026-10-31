@@ -74,14 +74,18 @@ source "${BATS_TEST_DIRNAME}/../helpers/bats-setup.sh"
   [[ "${output}" == *"重新导入节点"* ]]
 }
 
-@test "client security notice should separate Xray compatibility from the emergency update" {
+@test "client security notice should distinguish certificate fixes from stable recommendations" {
   run print_client_security_notice
   [ "${status}" -eq 0 ]
   [[ "${output}" == *'CA / 自签均适用'* ]]
   [[ "${output}" == *'v2rayN >= 7.24.9'* ]]
   [[ "${output}" == *'7.25.6'* ]]
   [[ "${output}" == *'26.10.10'* && "${output}" == *'26.10.17'* ]]
-  [[ "${output}" == *'26.10.21'* && "${output}" == *'预发布安全修复'* ]]
+  [[ "${output}" == *'26.10.21（已转为正式版）'* ]]
+  [[ "${output}" == *'26.10.29 或更新稳定版'* ]]
+  [[ "${output}" == *'Sing-box 建议使用 1.14.4 或更新稳定版'* ]]
+  [[ "${output}" == *'完整模板最低 1.14.0'* && "${output}" == *'不是当前安全建议'* ]]
+  [[ "${output}" != *'预发布安全修复'* ]]
   [[ "${output}" == *'不代表内核已修复'* ]]
 }
 
@@ -100,11 +104,38 @@ source "${BATS_TEST_DIRNAME}/../helpers/bats-setup.sh"
   [ "${status}" -eq 0 ]
   [[ "${output}" == *'CA / 自签均适用'* ]]
   [[ "${output}" == *'26.10.21'* ]]
+  [[ "${output}" == *'26.10.29'* && "${output}" == *'Sing-box 建议使用 1.14.4'* ]]
   [[ "${output}" != *self-signed-only* ]]
   insecure=true
   run show_info
   [ "${status}" -eq 0 ]
   [[ "${output}" == *'CA / 自签均适用'* && "${output}" == *self-signed-only* ]]
+  [[ "${output}" == *'26.10.29'* && "${output}" == *'Sing-box 建议使用 1.14.4'* ]]
+}
+
+@test "full Sing-box template display should show stable advice in CA and self-signed modes" {
+  require_meta_info() { :; }
+  clear() { :; }
+  wait_return() { :; }
+  get_certificate_public_key_sha256() { echo '47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='; }
+  ip=8.8.8.8
+  port=8443
+  password=abc123
+  up_mbps=50
+  down_mbps=200
+  sni=bing.com
+  for insecure in false true; do
+    run show_singbox_template
+    [ "${status}" -eq 0 ]
+    [[ "${output}" == *'Sing-box 建议使用 1.14.4 或更新稳定版'* ]]
+    [[ "${output}" == *'完整模板最低 1.14.0'* && "${output}" == *'不是当前安全建议'* ]]
+    [[ "${output}" == *'"http_clients": ['* ]]
+    if [[ "${insecure}" == true ]]; then
+      [[ "${output}" == *'"certificate_public_key_sha256": ['* ]]
+    else
+      [[ "${output}" != *'"certificate_public_key_sha256": ['* ]]
+    fi
+  done
 }
 
 @test "hysteria2 share URL should use URI boolean values" {

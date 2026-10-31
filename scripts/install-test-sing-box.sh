@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SING_BOX_TEST_VERSION="${1:-1.14.3}"
+SING_BOX_TEST_VERSION="${1:-1.14.4}"
 # 只允许审核过的版本与官方 Linux amd64 附件 SHA-256，不接受任意 URL/摘要覆盖。
+# 1.14.0 仅验证最低功能兼容，不是当前安全推荐版本。
 case "${SING_BOX_TEST_VERSION}" in
     1.14.0) SING_BOX_TEST_SHA256="2375de6999f4f56ab46b4fc5ddf26a6aba1d3e61a0f4e7ddec2f4690457d5f63" ;;
-    1.14.3) SING_BOX_TEST_SHA256="e2bdf179c15a3652955dc44867e33ca0965c9c9b91b34267dcc5a5d639a5feee" ;;
+    1.14.4) SING_BOX_TEST_SHA256="699a1b510aa4396b2176d32d1181920399ebf1e267835da6f3b598d0f7c24968" ;;
     *) echo "[ERROR] Unreviewed sing-box test version: ${SING_BOX_TEST_VERSION}" >&2; exit 1 ;;
 esac
 

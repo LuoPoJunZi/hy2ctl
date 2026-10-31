@@ -19,13 +19,13 @@ source "${BATS_TEST_DIRNAME}/../helpers/bats-setup.sh"
 
   run bash "${TEST_ROOT_DIR}/scripts/install-test-sing-box.sh"
   [ "${status}" -eq 0 ]
-  grep -Fq 'e2bdf179c15a3652955dc44867e33ca0965c9c9b91b34267dcc5a5d639a5feee' "${SING_BOX_TEST_COMMAND_LOG}"
-  grep -Fq 'sing-box-1.14.3-linux-amd64.tar.gz' "${SING_BOX_TEST_COMMAND_LOG}"
+  grep -Fq '699a1b510aa4396b2176d32d1181920399ebf1e267835da6f3b598d0f7c24968' "${SING_BOX_TEST_COMMAND_LOG}"
+  grep -Fq 'sing-box-1.14.4-linux-amd64.tar.gz' "${SING_BOX_TEST_COMMAND_LOG}"
   grep -Fq -- '--connect-timeout 10 --max-time 180' "${SING_BOX_TEST_COMMAND_LOG}"
   grep -Fq 'sing-box-1.14.0' "${GITHUB_PATH}"
-  grep -Fq 'sing-box-1.14.3' "${GITHUB_PATH}"
+  grep -Fq 'sing-box-1.14.4' "${GITHUB_PATH}"
 
-  run bash "${TEST_ROOT_DIR}/scripts/install-test-sing-box.sh" '1.14.3'
+  run bash "${TEST_ROOT_DIR}/scripts/install-test-sing-box.sh" '1.14.4'
   [ "${status}" -eq 0 ]
 }
 
@@ -33,7 +33,7 @@ source "${BATS_TEST_DIRNAME}/../helpers/bats-setup.sh"
   curl() { echo 'unexpected-download'; }
   export -f curl
   local version
-  for version in '1.14.2' '1.15.0-alpha.11'; do
+  for version in '1.14.2' '1.14.3' '1.15.0-alpha.13'; do
     run bash "${TEST_ROOT_DIR}/scripts/install-test-sing-box.sh" "${version}"
     [ "${status}" -ne 0 ]
     [[ "${output}" == *'Unreviewed sing-box test version'* ]]
@@ -51,7 +51,7 @@ source "${BATS_TEST_DIRNAME}/../helpers/bats-setup.sh"
   run bash "${TEST_ROOT_DIR}/scripts/install-test-sing-box.sh"
   [ "${status}" -ne 0 ]
   [[ "${output}" != *'unexpected-extraction'* ]]
-  [ ! -e "${TEST_TMP_DIR}/sing-box-1.14.3" ]
+  [ ! -e "${TEST_TMP_DIR}/sing-box-1.14.4" ]
   [ ! -e "${GITHUB_PATH}" ]
 }
 

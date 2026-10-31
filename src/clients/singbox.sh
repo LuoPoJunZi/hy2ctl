@@ -1,6 +1,11 @@
 # shellcheck shell=bash
 # 职责: Sing-box 完整模板展示入口
 
+print_singbox_security_notice() {
+    echo -e "  Sing-box 建议使用 1.14.4 或更新稳定版，并核对实际运行的客户端内核。"
+    echo -e "  Outbound 最低 1.13.0、完整模板最低 1.14.0 仅为功能兼容要求，不是当前安全建议。"
+}
+
 show_singbox_template() {
     if ! require_meta_info; then
         return
@@ -25,6 +30,7 @@ show_singbox_template() {
     echo -e "     ${_green}--- Sing-box 完整模板 (Android/iOS / 1.14+) ---${_plain}"
     print_line
     echo -e "${_blue}[兼容]${_plain} 通过 v2rayN 使用 Sing-box 1.14 内核时，建议 v2rayN >= 7.25.4。"
+    print_singbox_security_notice
     if ! render_singbox_full_template "${json_ip}" "${port}" "${up_mbps}" "${down_mbps}" "${json_password}" "${json_sni}" "${insecure}" "${cert_public_key_sha}"; then
         err "生成 Sing-box 完整模板失败，请重新配置节点。"
     fi

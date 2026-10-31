@@ -138,7 +138,7 @@ hy2
 
 ```text
 =====================================================
-  hy2ctl 管理面板 v26.10.22 |  快捷启动: hy2
+  hy2ctl 管理面板 v26.10.31 |  快捷启动: hy2
 =====================================================
   内核版本: v2.13.0    服务状态: 运行中
 -----------------------------------------------------
@@ -225,7 +225,7 @@ hy2
 - 菜单 `7` 复制完整模板（适合新建配置，使用新版 `rule_set` 规则格式）
 - 自签模式要求 Sing-box `1.13.0+`，脚本会自动加入 `certificate_public_key_sha256` 公钥固定
 - 完整模板要求 Sing-box `1.14.0+`，远程规则集通过顶层 `http_clients` 和 `route.default_http_client` 使用 `proxy` 出站下载，不再使用已弃用的 `download_detour`
-- 稳定版验证目标为 Sing-box `1.14.3`，同时保留 `1.14.0` 最低兼容验证。`1.15` alpha 仍处于测试阶段，不作为默认依赖，不在现有模板中替换 `certificate_public_key_sha256`；参见[官方更新说明](https://github.com/SagerNet/sing-box/releases/tag/v1.14.3)和[测试版日志](https://sing-box.sagernet.org/changelog/)。
+- 建议使用 Sing-box `1.14.4` 或更新稳定版，稳定版验证目标同步为 `1.14.4`；`1.13.0` / `1.14.0` 仅表示对应配置的最低功能兼容要求，不是当前安全建议。CI 保留 `1.14.0` 语法兼容验证。`1.15` alpha 仍处于测试阶段，不作为默认依赖，不在现有模板中替换 `certificate_public_key_sha256`；参见[官方更新说明](https://github.com/SagerNet/sing-box/releases/tag/v1.14.4)和[测试版日志](https://sing-box.sagernet.org/changelog/)。
 
 ### 7.3 自签模式注意
 
@@ -234,10 +234,11 @@ hy2
 - `insecure: true`
 - `certificate_public_key_sha256` 为脚本从当前服务器证书生成的值
 
-### 7.4 证书信任库安全更新（2026-10-22 核对）
+### 7.4 证书信任库安全更新（2026-10-31 核对）
 
-- Xray-core 官方撤回了 `26.10.10` / `26.10.17`，建议尽快使用 `26.10.21` 或后续明确包含证书信任修复的版本。`26.10.21` 当前是上游标记的**预发布安全修复**，不是正式稳定版；参见[官方安全更新说明](https://github.com/XTLS/Xray-core/releases/tag/v26.10.21)。
-- CA / 自签用户均应核对客户端实际运行的内核。v2rayN `7.25.6` 的[发布说明](https://github.com/2dust/v2rayN/releases/tag/7.25.6)仍引用已撤回的 Xray `26.10.10`，仅更新 v2rayN 不代表内核已修复。客户端内核需在客户端更新；VPS 菜单 `11` 不会更新电脑上的 Xray。
+- Xray-core 官方撤回了 `26.10.10` / `26.10.17`。证书信任修复始于 `26.10.21`，该版本已转为正式版；当前建议使用 `26.10.29` 或更新稳定版。参见[证书安全公告](https://github.com/XTLS/Xray-core/releases/tag/v26.10.21)和[当前稳定版](https://github.com/XTLS/Xray-core/releases/tag/v26.10.29)。
+- Sing-box `1.14.4` 使用 Go `1.26.10` 构建并更新了内置 CA 库，建议升级到该版或更新稳定版；参见[上游变更记录](https://github.com/SagerNet/sing-box/compare/v1.14.3...v1.14.4)。最低功能兼容验证不代表旧版满足当前证书安全建议。
+- CA / 自签用户均应核对客户端实际运行的 Xray-core / Sing-box 内核。v2rayN `7.25.6` 的[发布说明](https://github.com/2dust/v2rayN/releases/tag/7.25.6)仍引用已撤回的 Xray `26.10.10`，仅更新 v2rayN 不代表内核已修复。客户端内核需在客户端更新；VPS 菜单 `11` 不会更新电脑上的客户端内核。
 - Ubuntu [USN-8944-1](https://ubuntu.com/security/notices/USN-8944-1) 移除了涉及中间 CA 证书被攻破的根证书。Ubuntu 26.04 的 `ca-certificates` 修复版本为 `20260816ubuntu0.26.04.1`；22.04 / 24.04 / 26.10 使用各自公告版本，不能跨发行版套用版本号。系统更新后按发行版说明重启仍使用旧信任库的进程。
 - Go [CVE-2026-111943](https://go.dev/issue/82345) 的工具链修复分别位于 `1.26.10`、`1.27.3`；`1.27.0` 至 `1.27.2` 不能因为大于 `1.26.10` 就判为已修复。**仅升级系统 Go 不会修复现有二进制**，需使用上游包含修复的构建，厂商回移修复另行核实。
 - 软件包版本与 Go 构建版本只是分别核对该公告的依据，不证明所有 TLS 路径安全，也不涵盖自定义或内置 CA 库。不要通过 `curl -k`、关闭证书校验、移除证书固定或重新导入问题根证书来规避错误；现有节点不会因此自动重签证书或改写配置。
@@ -288,7 +289,7 @@ namei -l /etc/hysteria/config.yaml
 
 ### 8.5 Windows Sing-box TUN 高 CPU / Winsock 10055
 
-2026-10-03 的[上游用户报告 #4602](https://github.com/SagerNet/sing-box/issues/4602)描述了 Windows/SFW `1.14.2` 在 TUN 模式下出现大量 IPv6 UDP 连接和 Winsock `10055` 的现象；报告者关闭 Teredo 后现象停止。截至 2026-10-10，根因和影响范围尚未确认，不能据此断言面板模板有问题，也不能宣称 `1.14.3` 已修复该报告。
+2026-10-03 的[上游用户报告 #4602](https://github.com/SagerNet/sing-box/issues/4602)描述了 Windows/SFW `1.14.2` 在 TUN 模式下出现大量 IPv6 UDP 连接和 Winsock `10055` 的现象；报告者关闭 Teredo 后现象停止。截至 2026-10-31，该报告仍未关闭，根因和影响范围尚未确认。`1.14.4` 虽有 TUN 和连接清理改进，但没有确认解决此报告，不能据此断言面板模板有问题或该故障已修复。
 
 - 先记录客户端/内核版本、是否使用 TUN、最近日志及资源占用；同一节点临时改用非 TUN 系统代理，对比问题是否只在 TUN 下出现。
 - 可只读检查 Teredo 状态：`netsh interface teredo show state`。仅当症状与报告一致时，在维护窗口由用户决定是否做可恢复的 Teredo 对照测试；先记录原配置，测试后恢复，不直接关闭系统 IPv6。

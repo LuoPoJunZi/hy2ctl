@@ -202,7 +202,14 @@ assert_contains "${security_notice_output}" "CA / 自签均适用" "general safe
 assert_contains "${security_notice_output}" "v2rayN >= 7.24.9" "v2rayN security version notice missing"
 assert_contains "${security_notice_output}" "v2rayN >= 7.25.4" "v2rayN Sing-box 1.14 compatibility notice missing"
 assert_contains "${security_notice_output}" "26.10.21" "Xray emergency certificate update notice missing"
-assert_contains "${security_notice_output}" "预发布安全修复" "Xray security prerelease status must be explicit"
+assert_contains "${security_notice_output}" "26.10.21（已转为正式版）" "Xray certificate fix status must be current"
+assert_contains "${security_notice_output}" "26.10.29 或更新稳定版" "Xray stable recommendation missing"
+assert_contains "${security_notice_output}" "Sing-box 建议使用 1.14.4 或更新稳定版" "Sing-box stable recommendation missing"
+assert_contains "${security_notice_output}" "完整模板最低 1.14.0" "Sing-box compatibility minimum missing"
+assert_contains "${security_notice_output}" "不是当前安全建议" "compatibility must not imply a security recommendation"
+if [[ "${security_notice_output}" == *"预发布安全修复"* ]]; then
+    fail "Xray stable certificate fix must not be described as a prerelease"
+fi
 assert_contains "${notice_output}" "Sing-box >= 1.13.0" "sing-box pin version notice missing"
 assert_contains "${notice_output}" "pinnedPeerCertSha256" "v2rayN Xray pin mapping notice missing"
 assert_contains "${notice_output}" "已移除 allowInsecure" "removed allowInsecure notice missing"

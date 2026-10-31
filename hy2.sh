@@ -8,7 +8,7 @@
 # 交互式主面板不启用全局 errexit，各外部命令在对应流程中显式处理失败与回滚。
 
 # --- 1. 全局变量与颜色输出 ---
-sh_ver="v26.10.22"
+sh_ver="v26.10.31"
 
 _red="\033[0;31m"
 _green="\033[0;32m"
@@ -1526,6 +1526,11 @@ render_singbox_full_template() {
 # shellcheck shell=bash
 # 职责: Sing-box 完整模板展示入口
 
+print_singbox_security_notice() {
+    echo -e "  Sing-box 建议使用 1.14.4 或更新稳定版，并核对实际运行的客户端内核。"
+    echo -e "  Outbound 最低 1.13.0、完整模板最低 1.14.0 仅为功能兼容要求，不是当前安全建议。"
+}
+
 show_singbox_template() {
     if ! require_meta_info; then
         return
@@ -1550,6 +1555,7 @@ show_singbox_template() {
     echo -e "     ${_green}--- Sing-box 完整模板 (Android/iOS / 1.14+) ---${_plain}"
     print_line
     echo -e "${_blue}[兼容]${_plain} 通过 v2rayN 使用 Sing-box 1.14 内核时，建议 v2rayN >= 7.25.4。"
+    print_singbox_security_notice
     if ! render_singbox_full_template "${json_ip}" "${port}" "${up_mbps}" "${down_mbps}" "${json_password}" "${json_sni}" "${insecure}" "${cert_public_key_sha}"; then
         err "生成 Sing-box 完整模板失败，请重新配置节点。"
     fi
@@ -1600,10 +1606,12 @@ print_client_security_notice() {
     print_line
     echo -e "${_yellow}[客户端安全提醒：CA / 自签均适用]${_plain}"
     echo -e "  v2rayN >= 7.24.9 修复旧版下载器中间人攻击风险；建议使用 7.25.6 或更新稳定版。"
-    echo -e "  仅更新 v2rayN 不代表内核已修复，请在客户端核对实际 Xray-core 版本。"
+    echo -e "  仅更新 v2rayN 不代表内核已修复，请在客户端核对实际 Xray-core / Sing-box 版本。"
     echo -e "  Xray-core 26.10.10 / 26.10.17 已因证书信任问题撤版。"
-    echo -e "  请使用 26.10.21（上游预发布安全修复）或后续明确包含修复的版本。"
+    echo -e "  证书信任修复始于 26.10.21（已转为正式版）；建议使用 26.10.29 或更新稳定版。"
     echo -e "  公告：https://github.com/XTLS/Xray-core/releases/tag/v26.10.21"
+    echo -e "  稳定版：https://github.com/XTLS/Xray-core/releases/tag/v26.10.29"
+    print_singbox_security_notice
     echo -e "  通过 v2rayN 管理 Sing-box 1.14 内核时，请使用 v2rayN >= 7.25.4。"
     echo -e "  客户端内核需在客户端更新；菜单 (11) 更新的是 VPS 面板与 Hysteria2 内核。"
 }
@@ -1614,7 +1622,7 @@ print_v2rayn_insecure_notice() {
     echo -e "  原生 Hysteria2 使用 insecure=1 与 pinSHA256 验证自签证书。"
     echo -e "  v2rayN / Xray 使用 pcs 映射 pinnedPeerCertSha256。"
     echo -e "  自签功能兼容最低要求：v2rayN >= 7.17.1，Xray-core >= 26.2.6（不是当前安全建议）。"
-    echo -e "  Sing-box 自签配置使用公钥固定，请使用 Sing-box >= 1.13.0。"
+    echo -e "  Sing-box 自签功能兼容最低要求：Sing-box >= 1.13.0（不是当前安全建议），配置使用公钥固定。"
     echo -e "  分享链接已移除 allowInsecure，不再依赖已废弃的跳过验证字段。"
     echo -e "  重新生成自签证书后指纹会变化，客户端必须重新导入节点。"
 }
