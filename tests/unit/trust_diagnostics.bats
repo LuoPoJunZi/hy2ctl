@@ -31,7 +31,7 @@ mock_ubuntu_trust() {
   diagnostic_reset_context
 }
 
-@test "menu 8 should include both trust checks in the saved report" {
+@test "menu 8 should include trust and kernel checks in the saved report" {
   clear() { :; }
   wait_return() { :; }
   diagnostic_check_core() { :; }
@@ -41,10 +41,12 @@ mock_ubuntu_trust() {
   diagnostic_check_public_ip() { :; }
   diagnostic_check_go_trust() { diagnostic_print_result WARN go-trust-unknown; }
   diagnostic_check_ca_trust() { diagnostic_print_result WARN ca-trust-unknown; }
+  diagnostic_check_kernel_security() { diagnostic_print_result WARN kernel-patch-unknown; }
   show_diagnostics > "${TEST_TMP_DIR}/report.out"
   grep -Fq go-trust-unknown "${HY2_DIAG_LATEST}"
   grep -Fq ca-trust-unknown "${HY2_DIAG_LATEST}"
-  grep -Fq '0 OK / 2 WARN / 0 FAIL' "${HY2_DIAG_LATEST}"
+  grep -Fq kernel-patch-unknown "${HY2_DIAG_LATEST}"
+  grep -Fq '0 OK / 3 WARN / 0 FAIL' "${HY2_DIAG_LATEST}"
 }
 
 @test "Go build probe should read only a stable Toolchain field from the running binary" {

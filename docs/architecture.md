@@ -20,6 +20,7 @@
 - `core/ip.sh` 用 Bash 内建校验 IPv4、压缩/完整/IPv4 嵌入式 IPv6，筛选公网候选；特殊用途范围依据 [IANA IPv4](https://www.iana.org/assignments/iana-ipv4-special-registry/) / [IPv6](https://www.iana.org/assignments/iana-ipv6-special-registry/) 登记。不把地址分类当作实际可达证明。`fetch_public_ip` 每个地址族连接超时三秒、请求最多六秒，配置 `--max-filesize 128` 并在格式解析前拒绝超长结果；[curl 8.4 以前](https://curl.se/docs/manpage.html#--max-filesize)无法在传输中限制未知长度响应，不能把该参数称为旧版 curl 的内存硬上限。`fetch_local_ip` 只接受合法地址，公网候选优先。诊断区分外部确认和本机回退，不通过失败请求的部分响应更新元数据。
 - 模板顺序输出以减少子 Shell；组合函数必须逐段检查返回码。证书固定材料在首字节输出前校验。若写文件，调用方只能在渲染成功后发布临时文件，不能使用失败的部分输出。
 - `operations/diagnostic_trust.sh` 分别检查 Hysteria2 二进制的 Go `Toolchain` 和系统 CA 软件包，不依赖本机 Go SDK。只读解析 os-release，不执行文件内容；Ubuntu 按 USN-8944-1 使用 dpkg 原生版本比较，其他系统不套用 Ubuntu 基线。查询失败/未知归为 WARN，达到单项版本基线不等于验证整个信任链或自定义 CA 库。诊断不安装包、不刷新索引、不改写源，客户端更新提示不冒充 VPS 能探测远端客户端。
+- `operations/diagnostic_kernel.sh` 收集运行中的 Linux 内核、发行版、对应映像包和 MPTCP 开关，复用安全的 os-release 解析。只查询匹配运行版本的 dpkg 映像包或 RPM boot 文件所属包，不把已安装的新内核当作当前运行内核。不维护跨发行版的通用安全版本阈值；CVE-2026-98432 修复状态需按供应商公告人工核验，MPTCP 关闭/接口缺失不输出安全结论。诊断不修改软件源、sysctl、GODEBUG、服务或防火墙。
 - 面板不启用全局 `set -e`；关键失败路径显式 `return`。工程脚本使用 `set -euo pipefail`，语法检查逐个遍历文件。
 - CI 的 Ubuntu、Debian 和发布任务统一执行 `verify.sh all`，包括品牌同步、运行时边界和真实 Sing-box 校验。
 

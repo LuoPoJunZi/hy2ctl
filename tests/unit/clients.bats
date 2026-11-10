@@ -82,7 +82,10 @@ source "${BATS_TEST_DIRNAME}/../helpers/bats-setup.sh"
   [[ "${output}" == *'7.25.6'* ]]
   [[ "${output}" == *'26.10.10'* && "${output}" == *'26.10.17'* ]]
   [[ "${output}" == *'26.10.21（已转为正式版）'* ]]
-  [[ "${output}" == *'26.10.29 或更新稳定版'* ]]
+  [[ "${output}" == *'26.10.29 已因 Linux MPTCP 风险撤版'* ]]
+  [[ "${output}" == *'26.11.9 或更新稳定版'* ]]
+  [[ "${output}" == *'关闭 MPTCP 仅缓解风险'* && "${output}" == *'系统内核补丁'* ]]
+  [[ "${output}" != *'26.10.29 或更新稳定版'* ]]
   [[ "${output}" == *'Sing-box 建议使用 1.14.4 或更新稳定版'* ]]
   [[ "${output}" == *'完整模板最低 1.14.0'* && "${output}" == *'不是当前安全建议'* ]]
   [[ "${output}" != *'预发布安全修复'* ]]
@@ -104,13 +107,13 @@ source "${BATS_TEST_DIRNAME}/../helpers/bats-setup.sh"
   [ "${status}" -eq 0 ]
   [[ "${output}" == *'CA / 自签均适用'* ]]
   [[ "${output}" == *'26.10.21'* ]]
-  [[ "${output}" == *'26.10.29'* && "${output}" == *'Sing-box 建议使用 1.14.4'* ]]
+  [[ "${output}" == *'26.11.9 或更新稳定版'* && "${output}" == *'Sing-box 建议使用 1.14.4'* ]]
   [[ "${output}" != *self-signed-only* ]]
   insecure=true
   run show_info
   [ "${status}" -eq 0 ]
   [[ "${output}" == *'CA / 自签均适用'* && "${output}" == *self-signed-only* ]]
-  [[ "${output}" == *'26.10.29'* && "${output}" == *'Sing-box 建议使用 1.14.4'* ]]
+  [[ "${output}" == *'26.11.9 或更新稳定版'* && "${output}" == *'Sing-box 建议使用 1.14.4'* ]]
 }
 
 @test "full Sing-box template display should show stable advice in CA and self-signed modes" {

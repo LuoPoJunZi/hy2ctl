@@ -78,6 +78,8 @@ bash scripts/benchmark.sh <(git show HEAD:hy2.sh) 30
 
 `tests/unit/trust_diagnostics.bats` 使用临时 `HY2_OS_RELEASE_FILE` 和模拟的版本/包查询，覆盖 Go 维护分支边界、未知/失败/开发版构建、Ubuntu 各发行版基线、包版本比较失败、缺少工具及不执行 os-release 内容。仅模拟包查询与更新命令，不访问网络或安装真实软件包；其他发行版不能按 Ubuntu 基线判为安全。客户端测试同时覆盖 CA 与自签模式的通用安全提醒，并继续校验证书固定导出。
 
+`tests/unit/kernel_diagnostics.bats` 使用模拟的 uname / dpkg-query / RPM 和临时 `HY2_MPTCP_ENABLED_FILE`，覆盖 oracle 映像包、unsigned 包回退、只查询运行版本、失败/异常包信息、MPTCP 启用/关闭/缺失/异常与读取失败。包管理写入、网络、sysctl、防火墙、重启和 Go/Hysteria 版本探测均被模拟拦截；即使包版本很新或 MPTCP 已关闭，系统内核补丁也不能自动判为已修复。菜单 8 的集成测试验证内核检查与信任检查进入同一份菜单 9 报告。
+
 快照/恢复测试必须覆盖末项复制失败、当前指针发布失败、旧格式兼容、损坏指针拒绝、当前/手动快照清理保护以及服务重启后退出；IP 测试覆盖两种地址族、IPv6 压缩/嵌入格式、错误页面、部分响应、本机回退与公网诊断分级。Bats 新增用例不能只修改断言使错误输出“通过”；应先复现失败再验证修复。
 
 `verify.sh syntax/shellcheck` 递归发现 src、scripts、tests 中的 Shell 文件；Bats 递归发现 unit 中的用例。静态样例不要用 `.sh` 伪装不可执行文本。
